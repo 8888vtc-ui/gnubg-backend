@@ -6,6 +6,133 @@
 import { apiClient } from '@/config/api.config.js'
 
 export const gameApiService = {
+  // Priorité 1: Créer une partie contre GNUBG
+  async createGnubgGame(difficulty = 'EXPERT', playerColor = 'white') {
+    try {
+      const response = await fetch(`${apiClient.baseURL}/api/game/create-gnubg`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ difficulty, playerColor })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create GNUBG game');
+      }
+      
+      return {
+        success: true,
+        data: {
+          game: data.game
+        }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  },
+
+  // GNUBG AI Move
+  async getGnubgMove(gameId, boardState, dice, difficulty = 'EXPERT') {
+    try {
+      const response = await fetch(`${apiClient.baseURL}/api/game/gnubg-move`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ gameId, boardState, dice, difficulty })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get GNUBG move');
+      }
+      
+      return {
+        success: true,
+        data: {
+          move: data.move,
+          thinkingTime: data.thinkingTime
+        }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  },
+
+  // GNUBG Move Suggestions
+  async getMoveSuggestions(boardState, dice, playerColor = 'white') {
+    try {
+      const response = await fetch(`${apiClient.baseURL}/api/gnubg/move-suggestions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ boardState, dice, playerColor })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get move suggestions');
+      }
+      
+      return {
+        success: true,
+        data: {
+          suggestions: data.suggestions,
+          analysisTime: data.analysisTime
+        }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  },
+
+  // GNUBG Position Evaluation
+  async evaluatePosition(boardState, playerColor = 'white') {
+    try {
+      const response = await fetch(`${apiClient.baseURL}/api/gnubg/evaluate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ boardState, playerColor })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to evaluate position');
+      }
+      
+      return {
+        success: true,
+        data: {
+          evaluation: data.evaluation,
+          playerColor: data.playerColor
+        }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  },
+
   // Priorité 1: Créer une partie
   async createGame(mode = 'AI_VS_PLAYER', difficulty = 'MEDIUM') {
     try {

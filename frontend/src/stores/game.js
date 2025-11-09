@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { gameService } from '@/services/api'
+import { gameApiService } from '@/services/game-api.js'
 
 export const useGameStore = defineStore('game', {
   state: () => ({
@@ -34,7 +34,7 @@ export const useGameStore = defineStore('game', {
       this.error = null
       
       try {
-        const result = await gameService.createGame(gameMode, opponentId, difficulty)
+        const result = await gameApiService.createGame(gameMode, difficulty)
         this.currentGame = result.data.game
         this.boardState = result.data.game.boardState
         this.currentPlayer = result.data.game.currentPlayer

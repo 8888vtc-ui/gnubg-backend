@@ -34,6 +34,26 @@ const router = createRouter({
       component: GameView,
     },
     {
+      path: '/gnubg',
+      name: 'gnubg',
+      component: () => import('../views/GnubgView.vue'),
+    },
+    {
+      path: '/gurubot',
+      name: 'gurubot',
+      component: () => import('../views/GurubotView.vue'),
+    },
+    {
+      path: '/gurubot-chat',
+      name: 'gurubot-chat',
+      component: () => import('../views/GurubotChatView.vue'),
+    },
+    {
+      path: '/easybot',
+      name: 'easybot',
+      component: () => import('../views/EasyBotView.vue'),
+    },
+    {
       path: '/about',
       name: 'about',
       // route level code-splitting
