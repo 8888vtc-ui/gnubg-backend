@@ -356,6 +356,9 @@ app.use('/api/gurubot', gurubotRoutes);
 // EasyBot Beginner AI Routes
 app.use('/api/easybot', easybotRoutes);
 
+// WebSocket management routes
+app.use('/api/ws', websocketRoutes);
+
 // 404 handler
 app.use((req, res, next) => {
   res.status(404).json({
@@ -375,7 +378,11 @@ app.use((req, res, next) => {
       '/api/stats/games',
       '/api/gnubg/official/*',
       '/api/gurubot/*',
-      '/api/easybot/*'
+      '/api/easybot/*',
+      '/api/ws/stats',
+      '/api/ws/notify/:userId',
+      '/api/ws/broadcast/game/:id',
+      '/api/ws/broadcast/chat/:id'
     ]
   });
   return;
@@ -393,9 +400,6 @@ app.use((err, req, res, next) => {
 
 // Initialize WebSocket
 const wsServer = websocketRoutes.initializeWebSocket(server);
-
-// WebSocket management routes
-app.use('/api/ws', websocketRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;
