@@ -1,0 +1,31 @@
+[build]
+  base = "frontend/"
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions/"
+
+[build.environment]
+  NODE_VERSION = "18"
+  VITE_API_BASE_URL = "https://gammon-guru.netlify.app/api"
+  VITE_WEBSOCKET_URL = "wss://gammon-guru.netlify.app/.netlify/functions/websocket"
+  VITE_SUPABASE_URL = "https://votre-projet.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "votre-anon-key"
+  VITE_GA_MEASUREMENT_ID = "G-XXXXXXXXXX"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[dev]
+  framework = "vue"
+  targetPort = 3000
+  autoLaunch = false
