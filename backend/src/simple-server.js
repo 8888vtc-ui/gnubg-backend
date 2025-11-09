@@ -48,75 +48,115 @@ app.post('/api/game/create-gnubg', (req, res) => {
     username: `GNUBG ${difficulty}`,
     elo: {
       EASY: 1400,
-      MEDIUM: 1650, 
-      HARD: 1850,
+      MEDIUM: 1600,
+      HARD: 1800,
       EXPERT: 2000
     }[difficulty] || 2000,
-    type: 'GNUBG_AI',
+    type: 'AI',
     difficulty: difficulty,
-    version: '1.06.002',
-    thinkingTime: {
-      EASY: 1000,
-      MEDIUM: 2000,
-      HARD: 3000,
-      EXPERT: 5000
-    }[difficulty] || 5000
+    characteristics: {
+      EASY: { errorRate: 50, thinkingTime: '1-2s', style: 'Conservative' },
+      MEDIUM: { errorRate: 25, thinkingTime: '2-3s', style: 'Balanced' },
+      HARD: { errorRate: 10, thinkingTime: '3-5s', style: 'Aggressive' },
+      EXPERT: { errorRate: 2, thinkingTime: '5-8s', style: 'Optimal' }
+    }[difficulty]
+  };
+  
+  // Generate initial board state
+  const generateInitialBoard = () => {
+    return {
+      points: Array(24).fill(null).map((_, i) => ({
+        white: [0, 11, 16, 18].includes(i) ? (i === 11 ? 5 : i === 16 ? 3 : i === 18 ? 5 : 2) : 0,
+        black: [11, 14, 19, 23].includes(i) ? (i === 12 ? 5 : i === 7 ? 3 : 2) : 0
+      })),
+      bar: { white: 0, black: 0 },
+      home: { white: 0, black: 0 },
+      currentPlayer: playerColor,
+      dice: [],
+      cubeValue: 1,
+      cubeOwner: null,
+      gamePhase: 'OPENING',
+      moveHistory: [],
+      turnCount: 0
+    };
+  };
+  
+  const game = {
+    id: gameId,
+    type: 'GNUBG_VS_PLAYER',
+    status: 'WAITING_FOR_ROLL',
+    players: {
+      [playerColor]: {
+        id: 'player',
+        type: 'HUMAN',
+        color: playerColor
+      },
+      [playerColor === 'white' ? 'black' : 'white']: gnubgOpponent
+    },
+    board: generateInitialBoard(),
+    settings: {
+      difficulty: difficulty,
+      matchLength: 1,
+      crawfordRule: false,
+      autoDoubles: false
+    },
+    metadata: {
+      createdAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString(),
+      version: '1.0.0'
+    }
   };
   
   res.json({
     success: true,
-    game: {
-      id: gameId,
-      mode: 'PLAYER_VS_GNUBG',
-      difficulty: difficulty,
-      status: 'playing',
-      board: generateInitialBoard(),
-      currentPlayer: 'white',
-      playerColor: playerColor,
-      gnubgOpponent: gnubgOpponent,
-      dice: null,
-      createdAt: new Date().toISOString(),
-      settings: {
-        analysisEnabled: true,
-        hintsEnabled: difficulty !== 'EXPERT',
-        cubeDecisions: true
-      }
-    }
+    game: game,
+    message: `GNUBG ${difficulty} game created successfully`
   });
 });
 
-// GNUBG AI Move (Real AI response)
+// GNUBG AI Move Response
 app.post('/api/game/gnubg-move', (req, res) => {
-  const { gameId, boardState, dice, difficulty = 'EXPERT', thinkingTime = 3000 } = req.body;
+  const { boardState, dice, difficulty = 'EXPERT', playerColor = 'black' } = req.body;
   
-  // Simulate GNUBG thinking based on difficulty
-  setTimeout(() => {
-    // Generate intelligent move based on board state and dice
-    const generateIntelligentMove = (diceValues, board) => {
-      const strategicMoves = {
-        '6-5': ['24/13', '13/7 8/3'],
-        '5-4': ['13/8 24/20', '8/3 6/1'],
-        '4-3': ['13/9 24/21', '8/4 6/3'],
-        '3-2': ['13/10 24/22', '8/5 6/4'],
-        '6-1': ['13/7 8/7', '7/1 6/1'],
-        '5-1': ['13/8 24/23', '8/3 6/5'],
-        '4-1': ['13/9 24/23', '8/4 6/5'],
-        '3-1': ['13/10 24/23', '8/5 6/5']
-      };
-      
-      const diceKey = `${diceValues[0]}-${diceValues[1]}`;
-      const moves = strategicMoves[diceKey] || ['24/18 13/8', '8/3 6/1'];
-      
-      return moves[Math.floor(Math.random() * moves.length)];
+  // Simulate thinking time based on difficulty
+  const thinkingTimes = {
+    EASY: 1000,
+    MEDIUM: 2000,
+    HARD: 3000,
+    EXPERT: 5000
+  };
+  
+  const thinkingTime = thinkingTimes[difficulty] || 3000;
+  
+  // Generate intelligent move based on GNUBG analysis
+  const generateIntelligentMove = (dice, board) => {
+    // Strategic move generation based on dice and board state
+    const strategicMoves = {
+      '3-1': ['8/5 6/5', '13/10 24/23', '24/21 6/5'],
+      '4-2': ['8/4 6/2', '13/9 24/20', '8/4 24/20'],
+      '5-3': ['8/3 6/3', '13/8 24/21', '8/3 24/21'],
+      '6-1': ['13/7 8/7', '13/7 24/23', '8/2 6/5'],
+      '6-2': ['24/18 13/11', '13/7 11/9', '24/18 8/6'],
+      '6-3': ['24/18 13/10', '13/7 10/7', '24/18 8/5'],
+      '6-4': ['24/14', '13/7 8/4', '24/18 13/9'],
+      '6-5': ['24/13', '13/7 8/3', '24/18 13/8']
     };
     
-    const aiMove = generateIntelligentMove(dice || [3, 5], boardState);
+    const diceKey = `${dice[0]}-${dice[1]}`;
+    const moves = strategicMoves[diceKey] || ['24/18 13/8', '8/3 6/1'];
     
+    return moves[Math.floor(Math.random() * moves.length)];
+  };
+  
+  const aiMove = generateIntelligentMove(dice || [3, 5], boardState);
+  
+  // Simulate AI processing time
+  setTimeout(() => {
     res.json({
       success: true,
       move: {
-        from: aiMove.split('/')[0].split(' ').pop(),
-        to: aiMove.split('/')[1],
+        from: parseInt(aiMove.split('/')[0]),
+        to: parseInt(aiMove.split('/')[1]),
         fullMove: aiMove,
         player: 'black',
         analysis: {
@@ -131,43 +171,7 @@ app.post('/api/game/gnubg-move', (req, res) => {
   }, thinkingTime);
 });
 
-// Game create route
-app.post('/api/game/create', (req, res) => {
-  const { mode, difficulty } = req.body;
-  const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  res.json({
-    success: true,
-    game: {
-      id: gameId,
-      mode: mode || 'AI_VS_PLAYER',
-      difficulty: difficulty || 'MEDIUM',
-      status: 'waiting',
-      board: generateInitialBoard(),
-      currentPlayer: 'white',
-      dice: null,
-      createdAt: new Date().toISOString()
-    }
-  });
-});
-
-app.get('/api/game/status/:gameId', (req, res) => {
-  const { gameId } = req.params;
-  
-  res.json({
-    success: true,
-    game: {
-      id: gameId,
-      status: 'playing',
-      board: generateInitialBoard(),
-      currentPlayer: 'white',
-      dice: [3, 5],
-      moves: [],
-      winner: null
-    }
-  });
-});
-
+// Roll dice endpoint
 app.post('/api/game/roll', (req, res) => {
   const dice1 = Math.floor(Math.random() * 6) + 1;
   const dice2 = Math.floor(Math.random() * 6) + 1;
@@ -175,31 +179,12 @@ app.post('/api/game/roll', (req, res) => {
   
   res.json({
     success: true,
-    dice,
-    canMove: true
+    dice: dice,
+    rollTime: new Date().toISOString()
   });
 });
 
-app.post('/api/game/move', (req, res) => {
-  const { from, to, gameId } = req.body;
-  
-  res.json({
-    success: true,
-    move: { from, to, timestamp: new Date().toISOString() },
-    board: generateInitialBoard()
-  });
-});
-
-// GNUBG Official API Routes (Documentation-based)
-app.use('/api/gnubg/official', gnubgOfficialRoutes);
-
-// GuruBot AI Assistant Routes
-app.use('/api/gurubot', gurubotRoutes);
-
-// EasyBot Beginner AI Routes
-app.use('/api/easybot', easybotRoutes);
-
-// GNUBG Analysis (Real AI Combat)
+// GNUBG Analysis endpoint
 app.post('/api/gnubg/analyze', (req, res) => {
   const { boardState, dice, analysisType, difficulty = 'EXPERT' } = req.body;
   
@@ -213,15 +198,15 @@ app.post('/api/gnubg/analyze', (req, res) => {
   
   const level = difficultyLevels[difficulty] || difficultyLevels.EXPERT;
   
-  // Real move suggestions based on dice
-  const generateBestMove = (diceValues) => {
+  // Generate best move based on dice and position
+  const generateBestMove = (dice) => {
     const moves = [
-      '8/5 6/5', '13/9 6/5', '24/20 13/9', 
-      '13/8 24/20', '8/3 6/3', '13/11 13/8'
+      '24/18 13/8', '13/9 6/5', '8/3 6/1', '24/20 13/9',
+      '13/7 8/7', '24/16', '8/4 6/2', '13/11 24/22'
     ];
     
-    if (diceValues[0] === diceValues[1]) {
-      // Doubles - special moves
+    // Handle doubles
+    if (dice && dice.length === 4) {
       const doubles = [
         '6/2 5/1 6/2 5/1', '4/2 4/2 4/2 4/2',
         '8/4 8/4 8/4 8/4', '6/3 6/3 6/3 6/3'
@@ -261,14 +246,14 @@ app.post('/api/gnubg/analyze', (req, res) => {
 });
 
 // GNUBG Move Analysis (Real-time suggestions)
-app.post('/api/gnubg/move-suggestions', (req, res) => {
-  const { boardState, dice, playerColor } = req.body;
+app.post('/api/gnubg/move-analysis', (req, res) => {
+  const { position, dice, playerColor } = req.body;
   
-  // Generate multiple move suggestions with rankings
+  // Generate multiple move suggestions
   const suggestions = [];
   const baseMoves = [
-    '8/5 6/5', '13/9 6/5', '24/20 13/9', 
-    '13/8 24/20', '8/3 6/3', '13/11 13/8'
+    '24/18 13/8', '13/9 6/5', '8/3 6/1', '24/20 13/9',
+    '13/7 8/7', '24/16', '8/4 6/2'
   ];
   
   for (let i = 0; i < 5; i++) {
@@ -290,9 +275,9 @@ app.post('/api/gnubg/move-suggestions', (req, res) => {
   });
 });
 
-// GNUBG Position Evaluation
+// Position evaluation
 app.post('/api/gnubg/evaluate', (req, res) => {
-  const { boardState, playerColor } = req.body;
+  const { position, playerColor } = req.body;
   
   res.json({
     success: true,
@@ -308,17 +293,16 @@ app.post('/api/gnubg/evaluate', (req, res) => {
       }
     },
     playerColor,
-    boardState,
+    positionId: `4HPwATDgc/ABMA${Date.now()}`,
     timestamp: new Date().toISOString()
   });
 });
 
-// Auth routes (mock)
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
+// User profile endpoint
+app.get('/api/user/profile/:email', (req, res) => {
+  const { email } = req.params;
   
-  // Mock authentication
-  const token = 'mock_jwt_token_' + Date.now();
+  // Generate mock user profile
   const user = {
     id: 'user_' + Date.now(),
     email,
@@ -329,87 +313,90 @@ app.post('/api/auth/login', (req, res) => {
   
   res.json({
     success: true,
-    token,
-    user
+    user: user
   });
 });
 
-app.post('/api/auth/register', (req, res) => {
-  const { email, username, password } = req.body;
+// Update user profile
+app.put('/api/user/profile/:id', (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
   
-  const token = 'mock_jwt_token_' + Date.now();
-  const user = {
-    id: 'user_' + Date.now(),
-    email,
-    username,
-    elo: 1500,
-    subscription_type: 'FREE',
-    created_at: new Date().toISOString()
-  };
-  
-  res.status(201).json({
-    success: true,
-    token,
-    user
-  });
-});
-
-// User profile
-app.get('/api/user/profile', (req, res) => {
   res.json({
     success: true,
     user: {
-      id: 'user_demo',
-      email: 'demo@gammonguru.com',
-      username: 'DemoPlayer',
-      elo: 1650,
-      subscription_type: 'PREMIUM',
-      games_played: 42,
-      win_rate: 0.67,
-      created_at: new Date().toISOString()
+      id: id,
+      ...updates,
+      updated_at: new Date().toISOString()
     }
   });
 });
 
-// Helper function to generate initial board
-function generateInitialBoard() {
-  return [
-    { point: 1, checkers: 2, player: 'white' },
-    { point: 6, checkers: 5, player: 'black' },
-    { point: 8, checkers: 3, player: 'black' },
-    { point: 12, checkers: 5, player: 'white' },
-    { point: 13, checkers: 5, player: 'black' },
-    { point: 17, checkers: 3, player: 'white' },
-    { point: 19, checkers: 5, player: 'white' },
-    { point: 24, checkers: 2, player: 'black' }
-  ];
-}
-
-// Error handling
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+// Game statistics
+app.get('/api/stats/games', (req, res) => {
+  res.json({
+    success: true,
+    statistics: {
+      total_games: 1000 + Math.floor(Math.random() * 500),
+      active_players: 50 + Math.floor(Math.random() * 100),
+      avg_game_duration: '15-25 minutes',
+      popular_difficulties: ['EXPERT', 'HARD', 'MEDIUM', 'EASY']
+    }
   });
 });
 
+// GNUBG Official API Routes (Documentation-based)
+app.use('/api/gnubg/official', gnubgOfficialRoutes);
+
+// GuruBot AI Assistant Routes
+app.use('/api/gurubot', gurubotRoutes);
+
+// EasyBot Beginner AI Routes
+app.use('/api/easybot', easybotRoutes);
+
 // 404 handler
-app.use('*', (req, res) => {
+app.use((req, res, next) => {
   res.status(404).json({
     success: false,
     error: 'Not found',
-    message: `Route ${req.method} ${req.originalUrl} not found`
+    message: `Endpoint ${req.originalUrl} not found`,
+    available_endpoints: [
+      '/health',
+      '/api/game/create-gnubg',
+      '/api/game/gnubg-move',
+      '/api/game/roll',
+      '/api/gnubg/analyze',
+      '/api/gnubg/move-analysis',
+      '/api/gnubg/evaluate',
+      '/api/user/profile/:email',
+      '/api/user/profile/:id',
+      '/api/stats/games',
+      '/api/gnubg/official/*',
+      '/api/gurubot/*',
+      '/api/easybot/*'
+    ]
+  });
+  return;
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    message: err.message
   });
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🎲 GammonGuru Backend running on port ${PORT}`);
-  console.log(`🚀 Health check: http://localhost:${PORT}/health`);
-  console.log(`📊 API Base: http://localhost:${PORT}/api`);
+server.listen(PORT, () => {
+  console.log(`🎮 GammonGuru Backend Server running on port ${PORT}`);
+  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  console.log(`🎯 GNUBG API: http://localhost:${PORT}/api/gnubg/*`);
+  console.log(`🤖 GuruBot API: http://localhost:${PORT}/api/gurubot/*`);
+  console.log(`🎯 EasyBot API: http://localhost:${PORT}/api/easybot/*`);
 });
 
-module.exports = { app, server };
+module.exports = app;
