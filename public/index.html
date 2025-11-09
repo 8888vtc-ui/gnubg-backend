@@ -150,7 +150,7 @@
             switch(endpoint) {
                 case 'login':
                     testName = 'Login Utilisateur';
-                    url = `${API_BASE}/auth/login`;
+                    url = `${API_BASE}/login`;
                     options = {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -163,7 +163,7 @@
                     
                 case 'profile':
                     testName = 'Get Profile';
-                    url = `${API_BASE}/user/profile`;
+                    url = `${API_BASE}/profile`;
                     options = {
                         method: 'GET',
                         headers: { 'Content-Type': 'application/json' }
@@ -172,7 +172,7 @@
                     
                 case 'game':
                     testName = 'Create Game';
-                    url = `${API_BASE}/game/create`;
+                    url = `${API_BASE}/create`;
                     options = {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -185,7 +185,7 @@
                     
                 case 'analyze':
                     testName = 'GNUBG Analyze';
-                    url = `${API_BASE}/gnubg/analyze`;
+                    url = `${API_BASE}/analyze`;
                     options = {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
