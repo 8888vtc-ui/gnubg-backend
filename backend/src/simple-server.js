@@ -11,6 +11,8 @@ const { createServer } = require('http');
 const gnubgOfficialRoutes = require('./routes/gnubg-official.routes.js');
 const gurubotRoutes = require('./routes/gurubot.routes.js');
 const easybotRoutes = require('./routes/easybot.routes.js');
+const websocketRoutes = require('./routes/websocket.routes.js');
+const wsService = require('./services/websocket.service');
 
 const app = express();
 const server = createServer(app);
@@ -389,6 +391,12 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Initialize WebSocket
+const wsServer = websocketRoutes.initializeWebSocket(server);
+
+// WebSocket management routes
+app.use('/api/ws', websocketRoutes);
+
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
@@ -397,6 +405,8 @@ server.listen(PORT, () => {
   console.log(`🎯 GNUBG API: http://localhost:${PORT}/api/gnubg/*`);
   console.log(`🤖 GuruBot API: http://localhost:${PORT}/api/gurubot/*`);
   console.log(`🎯 EasyBot API: http://localhost:${PORT}/api/easybot/*`);
+  console.log(`🔌 WebSocket Server: ws://localhost:${PORT}/ws/*`);
+  console.log(`📊 WebSocket Stats: http://localhost:${PORT}/api/ws/stats`);
 });
 
 module.exports = app;
