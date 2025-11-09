@@ -1,7 +1,7 @@
 [build]
-  publish = "public"
+  publish = "frontend/dist"
   functions = "functions"
-  command = "echo 'GammonGuru Complete Build - $(date)'"
+  command = "npm run build:netlify"
 
 [build.environment]
   NODE_VERSION = "18"
