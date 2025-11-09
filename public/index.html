@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GammonGuru Backend API</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .api-list {
+            list-style: none;
+            padding: 0;
+        }
+        .api-item {
+            background: rgba(255,255,255,0.1);
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #00ff88;
+        }
+        .method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .get { background: #4CAF50; }
+        .post { background: #2196F3; }
+        .put { background: #FF9800; }
+        .status {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(0,255,136,0.2);
+            border-radius: 10px;
+            border: 2px solid #00ff88;
+        }
+        .test-btn {
+            background: #00ff88;
+            color: #333;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        .test-btn:hover {
+            background: #00cc6a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎲 GammonGuru Backend API</h1>
+        
+        <div class="status">
+            <h2>🚀 API Status: ONLINE</h2>
+            <p>Serverless Functions • 100% Cloud • Auto-scaling</p>
+        </div>
+
+        <h3>📡 Available Endpoints</h3>
+        <ul class="api-list">
+            <li class="api-item">
+                <span class="method post">POST</span>
+                <strong>/api/auth/register</strong> - User registration
+                <button class="test-btn" onclick="testRegister()">Test</button>
+            </li>
+            <li class="api-item">
+                <span class="method post">POST</span>
+                <strong>/api/auth/login</strong> - User authentication
+                <button class="test-btn" onclick="testLogin()">Test</button>
+            </li>
+            <li class="api-item">
+                <span class="method get">GET</span>
+                <strong>/api/user/profile</strong> - Get user profile
+                <button class="test-btn" onclick="testProfile()">Test</button>
+            </li>
+            <li class="api-item">
+                <span class="method put">PUT</span>
+                <strong>/api/user/profile</strong> - Update user profile
+            </li>
+            <li class="api-item">
+                <span class="method post">POST</span>
+                <strong>/api/game/create</strong> - Create new game
+                <button class="test-btn" onclick="testCreateGame()">Test</button>
+            </li>
+            <li class="api-item">
+                <span class="method get">GET</span>
+                <strong>/api/game/status</strong> - Get game status
+            </li>
+            <li class="api-item">
+                <span class="method post">POST</span>
+                <strong>/api/gnubg/analyze</strong> - GNUBG position analysis
+                <button class="test-btn" onclick="testAnalyze()">Test</button>
+            </li>
+        </ul>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <p><strong>🌐 Infrastructure:</strong> Netlify Functions + Supabase PostgreSQL</p>
+            <p><strong>⚡ Performance:</strong> Serverless auto-scaling worldwide CDN</p>
+            <p><strong>🔒 Security:</strong> JWT authentication + bcrypt + rate limiting</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let authToken = '';
+
+        async function testRegister() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'test@gammon-guru.com',
+                        password: 'password123',
+                        username: 'TestUser'
+                    })
+                });
+                const result = await response.json();
+                alert('Register: ' + JSON.stringify(result, null, 2));
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function testLogin() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'test@gammon-guru.com',
+                        password: 'password123'
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    authToken = result.data.token;
+                }
+                alert('Login: ' + JSON.stringify(result, null, 2));
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function testProfile() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/user/profile`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json();
+                alert('Profile: ' + JSON.stringify(result, null, 2));
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function testCreateGame() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/game/create`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        gameMode: 'AI_VS_PLAYER',
+                        difficulty: 'MEDIUM'
+                    })
+                });
+                const result = await response.json();
+                alert('Create Game: ' + JSON.stringify(result, null, 2));
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function testAnalyze() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/gnubg/analyze`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        boardState: '4HPwATDgc/ABMA',
+                        dice: [3, 1],
+                        move: '8/5 6/5'
+                    })
+                });
+                const result = await response.json();
+                alert('Analyze: ' + JSON.stringify(result, null, 2));
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

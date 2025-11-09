@@ -1,7 +1,12 @@
-﻿node_modules/
+node_modules/
 .env
+.env.local
+.env.production
 temp/
 dist/
 .idea/
 .vscode/
 *.log
+test-db-connection.js
+test-api-simple.js
+test-netlify-functions.js
