@@ -97,7 +97,6 @@ export interface GameState {
   readonly dice: Dice | null;
   readonly moves: readonly Move[];
   readonly winner: PlayerId | null;
-  readonly winner?: Player;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly settings: GameSettings;

@@ -1,0 +1,6 @@
+/**
+ * Auth Routes Simplifiées - Sans middleware externes
+ */
+declare const router: import("express-serve-static-core").Router;
+export default router;
+//# sourceMappingURL=auth.routes.simple.d.ts.map

@@ -10,7 +10,7 @@ import {
   GnubgPositionEvaluation,
   AnalysisType,
   PlayerColor
-} from '../types';
+} from '../types/gnubg.types';
 import { EnvConfig } from '../config';
 import { Logger } from '../utils';
 import { ValidationUtils, AnalyzeRequestSchema } from '../utils';
