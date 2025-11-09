@@ -40,8 +40,8 @@ function logout() {
 }
 
 function startNewGame() {
-  // Rediriger vers la page d'analyse
-  router.push('/analyze');
+  // Rediriger vers la page de jeu
+  router.push('/game');
 }
 </script>
 
