@@ -10,6 +10,19 @@
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green.svg)](https://supabase.com/)
 [![Render](https://img.shields.io/badge/Render-Docker-blue.svg)](https://render.com/)
 
+## 🚀 **RENDER DEPLOYMENT - FREE TIER SUCCESS!** 🎉
+
+**✅ Successfully deployed on Render Free Tier!**  
+**✅ Full backend running without costs!**  
+**✅ Prisma working perfectly on Render!**
+
+### **Free Tier Benefits:**
+- **750 hours/month** free compute time
+- **750 GB/month** free bandwidth  
+- **Persistent storage** included
+- **Custom domains** supported
+- **SSL certificates** automatic
+
 ---
 
 ## 🏗️ Architecture Hybride Complète
@@ -428,18 +441,31 @@ user_analytics (id, user_id, date, games_played, analyses_completed, created_at)
 
 ## 💰 Coûts Prévisibles
 
-### **Monthly Estimate**
-- **Netlify** : $0-19/mois (trafic functions)
-- **Render** : $7-50/mois (backend Express avec persistence)
-- **Supabase** : $0-25/mois (database)
-- **Stripe** : 2.9% + $0.30/transaction
-- **GNUBG API** : $10-50/mois (analyses)
-- **Total** : **$17-144/mois maximum**
+### **🎉 FREE TIER SUCCESS - CURRENTLY $0/month!**
 
-### **Scaling**
-- **Auto-scaling** : Fonctions + backend
-- **Pay-per-use** : Coût proportionnel
-- **Zero downtime** : Maintenance transparente
+**Backend running completely FREE on Render:**
+- ✅ **750 hours/month** included (plenty for development)
+- ✅ **Persistent storage** included
+- ✅ **SSL certificates** included
+- ✅ **Custom domains** supported
+
+### **Future Scaling Costs (when needed):**
+- **Render** : $7-50/mois (upgrade when traffic grows)
+- **Netlify** : $0-19/mois (frontend + functions)
+- **Supabase** : $0-25/mois (database)
+- **Total** : **$0-94/mois** (starts free, scales with usage)
+
+### **Free Tier Limits:**
+- **750 hours/month** (~31 days continuous)
+- **750 GB bandwidth/month**
+- **100 GB storage**
+- **Perfect for development and early users**
+
+### **Scaling Strategy:**
+- **Start FREE** with Render free tier
+- **Scale automatically** as user base grows
+- **Pay-per-use** model ensures cost efficiency
+- **Zero downtime** during scaling
 
 ---
 
@@ -455,7 +481,32 @@ user_analytics (id, user_id, date, games_played, analyses_completed, created_at)
 
 ---
 
-## 🤝 Contribution
+## 🎯 **DEVELOPMENT ROADMAP & STATUS**
+
+### **✅ COMPLETED:**
+- ✅ **Backend Infrastructure** - Deployed on Render Free Tier
+- ✅ **Database Setup** - Prisma + Supabase PostgreSQL  
+- ✅ **Authentication System** - JWT with bcrypt
+- ✅ **API Framework** - Express.js with TypeScript
+- ✅ **Security** - Helmet, CORS, rate limiting
+- ✅ **Docker Deployment** - Production-ready containerization
+
+### **🚧 IN PROGRESS:**
+- 🔄 **API Testing** - Document and test all endpoints
+- 🔄 **Frontend Integration** - Connect Vue.js to Render API
+- 🔄 **User Auth Flow** - Registration/Login UI implementation
+
+### **📋 NEXT PRIORITIES:**
+- 🎮 **Game Logic** - Core backgammon rules engine
+- 🔴 **Real-time Multiplayer** - WebSocket implementation  
+- 🤖 **GNUBG Integration** - AI analysis API
+- 📊 **User Dashboard** - Game history & statistics
+- 🏆 **Tournaments** - Competitive gaming system
+
+### **🎯 DEVELOPMENT FOCUS:**
+**Building the complete user experience from registration to multiplayer gaming!**
+
+---
 
 ### **Workflow**
 1. Fork du repository
