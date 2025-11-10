@@ -8,7 +8,7 @@
 [![Vue.js](https://img.shields.io/badge/Vue.js-3-green.svg)](https://vuejs.org/)
 [![Netlify](https://img.shields.io/badge/Netlify-Functions-orange.svg)](https://netlify.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green.svg)](https://supabase.com/)
-[![Railway](https://img.shields.io/badge/Railway-Docker-blue.svg)](https://railway.app/)
+[![Render](https://img.shields.io/badge/Render-Docker-blue.svg)](https://render.com/)
 
 ---
 
@@ -16,7 +16,7 @@
 
 **GammonGuru** utilise une double architecture backend pour optimiser les performances et la scalabilité :
 
-### 🔧 **Backend Express.js** (Railway)
+### 🔧 **Backend Express.js** (Render)
 - **WebSocket temps réel** : Multijoueur synchronisé
 - **Traitements lourds** : Analyse GNUBG avancée
 - **API REST complète** : 15+ endpoints
@@ -255,7 +255,7 @@ WS     /ws/notifications           # Notifications user
 | **Authentification** | JWT + bcryptjs | Sécurité tokens |
 | **WebSocket** | ws + Socket.io | Temps réel |
 | **IA Engine** | GNUBG API | Analyse backgammon |
-| **Containerisation** | Docker | Déploiement Railway |
+| **Containerisation** | Docker | Déploiement Render |
 | **CDN** | Netlify Edge | Mondial |
 | **Monitoring** | Sentry + Winston | Erreurs + logs |
 | **Paiements** | Stripe | Abonnements |
@@ -284,21 +284,33 @@ Configuration `netlify.toml` :
   status = 200
 ```
 
-### 2. **Railway** (Backend Express)
+### 2. **Render** (Backend Express) - **PRIMARY DEPLOYMENT**
 ```bash
-# Connecter repo GitHub
-# Docker build automatique
-# URL : https://gammon-guru-api.railway.app
+# Connecter repo GitHub à Render
+# Docker build automatique avec Prisma
+# URL : https://gammon-guru-api.onrender.com
 ```
 
-Configuration `railway.toml` :
-```toml
-[build]
-  builder = "NIXPACKS"
-
-[deploy]
-  healthcheckPath = "/health"
-  restartPolicyType = "ON_FAILURE"
+Configuration `render.yaml` :
+```yml
+services:
+  - type: web
+    name: gammon-guru-backend
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://gammon-guru.netlify.app
+    healthCheckPath: /health
 ```
 
 ### 3. **Supabase** (Database)
@@ -418,11 +430,11 @@ user_analytics (id, user_id, date, games_played, analyses_completed, created_at)
 
 ### **Monthly Estimate**
 - **Netlify** : $0-19/mois (trafic functions)
-- **Railway** : $5-20/mois (backend Express)
+- **Render** : $7-50/mois (backend Express avec persistence)
 - **Supabase** : $0-25/mois (database)
 - **Stripe** : 2.9% + $0.30/transaction
 - **GNUBG API** : $10-50/mois (analyses)
-- **Total** : **$15-114/mois maximum**
+- **Total** : **$17-144/mois maximum**
 
 ### **Scaling**
 - **Auto-scaling** : Fonctions + backend
@@ -437,9 +449,9 @@ user_analytics (id, user_id, date, games_played, analyses_completed, created_at)
 |---------|-----|------|
 | **Application** | https://gammon-guru.netlify.app | Frontend Vue.js |
 | **API Serverless** | https://gammon-guru.netlify.app/api | Netlify Functions |
-| **API Express** | https://gammon-guru-api.railway.app | Backend complet |
-| **WebSocket** | wss://gammon-guru-api.railway.app/ws | Temps réel |
-| **GNUBG Service** | https://gammon-guru-gnu.railway.app | Analyse IA |
+| **API Express** | https://gammon-guru-api.onrender.com | Backend complet |
+| **WebSocket** | wss://gammon-guru-api.onrender.com/ws | Temps réel |
+| **GNUBG Service** | https://gammon-guru-gnu.onrender.com | Analyse IA |
 
 ---
 

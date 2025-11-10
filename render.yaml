@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: gammon-guru-backend
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://gammon-guru.netlify.app
