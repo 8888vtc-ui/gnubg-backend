@@ -22,27 +22,27 @@
   # PORT is automatically set by Railway
   
   # JWT Configuration
-  JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production"
-  JWT_REFRESH_SECRET = "your-refresh-secret-key-change-this"
+  # JWT_SECRET - Set in Railway environment variables
+  # JWT_REFRESH_SECRET - Set in Railway environment variables
   
   # Database Configuration
-  SUPABASE_URL = "your-supabase-url"
-  SUPABASE_SERVICE_KEY = "your-supabase-service-key"
+  # SUPABASE_URL - Set in Railway environment variables
+  # SUPABASE_SERVICE_KEY - Set in Railway environment variables
   
   # Monitoring Configuration
-  SENTRY_DSN = "your-sentry-dsn"
+  # SENTRY_DSN - Set in Railway environment variables
   
   # GNUBG Analysis Configuration
-  GNUBG_SERVICE_URL = "https://your-gnubg-service.com"
-  GNUBG_API_KEY = "your-gnubg-api-key"
+  # GNUBG_SERVICE_URL - Set in Railway environment variables
+  # GNUBG_API_KEY - Set in Railway environment variables
   
   # CORS Configuration
   FRONTEND_URL = "https://gammon-guru.netlify.app"
   
   # AI API Keys
-  ANTHROPIC_API_KEY = "your-claude-api-key-here"
-  OPENAI_API_KEY = "your-openai-api-key-here"
-  REPLICATE_API_TOKEN = "your-replicate-api-token-here"
+  # ANTHROPIC_API_KEY - Set in Railway environment variables
+  # OPENAI_API_KEY - Set in Railway environment variables
+  # REPLICATE_API_TOKEN - Set in Railway environment variables
 
 # Service configuration
 [[services]]
