@@ -25,15 +25,16 @@ export const createGameController = async (req: AuthRequest, res: Response) => {
         status: GameStatus.WAITING,
         board_state: "4HPwATDgc/ABMA", // Standard backgammon starting position
         current_player: "WHITE"
-      },
-      include: {
-        users_games_white_player_idTousers: {
-          select: {
-            id: true,
-            username: true,
-            elo: true
-          }
-        }
+      }
+    });
+
+    // Get user data separately
+    const user = await prisma.users.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        username: true,
+        elo: true
       }
     });
 
@@ -42,7 +43,7 @@ export const createGameController = async (req: AuthRequest, res: Response) => {
       data: {
         game: {
           id: game.id,
-          whitePlayer: game.users_games_white_player_idTousers,
+          whitePlayer: user,
           status: game.status,
           gameMode: game.gameMode,
           boardState: game.board_state,
@@ -75,20 +76,6 @@ export const getGameStatus = async (req: AuthRequest, res: Response) => {
     const game = await prisma.games.findUnique({
       where: { id: gameId },
       include: {
-        users_games_white_player_idTousers: {
-          select: {
-            id: true,
-            username: true,
-            elo: true
-          }
-        },
-        users_games_black_player_idTousers: {
-          select: {
-            id: true,
-            username: true,
-            elo: true
-          }
-        },
         game_moves: {
           orderBy: { createdAt: 'asc' }
         }
@@ -102,13 +89,25 @@ export const getGameStatus = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Get player data separately
+    const [whitePlayer, blackPlayer] = await Promise.all([
+      game.white_player_id ? prisma.users.findUnique({
+        where: { id: game.white_player_id },
+        select: { id: true, username: true, elo: true }
+      }) : null,
+      game.black_player_id ? prisma.users.findUnique({
+        where: { id: game.black_player_id },
+        select: { id: true, username: true, elo: true }
+      }) : null
+    ]);
+
     res.json({
       success: true,
       data: {
         game: {
           id: game.id,
-          whitePlayer: game.users_games_white_player_idTousers,
-          blackPlayer: game.users_games_black_player_idTousers,
+          whitePlayer: whitePlayer,
+          blackPlayer: blackPlayer,
           status: game.status,
           gameMode: game.gameMode,
           boardState: game.board_state,
@@ -200,11 +199,27 @@ export const makeMove = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Get current game state to get dice
+    const game = await prisma.games.findUnique({
+      where: { id: gameId },
+      select: { dice: true, current_player: true }
+    });
+
+    if (!game) {
+      return res.status(404).json({
+        success: false,
+        error: 'Game not found'
+      });
+    }
+
     // Record the move
     await prisma.game_moves.create({
       data: {
         game_id: gameId,
         user_id: req.user.id,
+        player: game.current_player,
+        dice: game.dice || [],
+        move: `move ${from} to ${to}`,
         from_point: from,
         to_point: to
       }
