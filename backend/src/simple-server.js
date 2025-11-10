@@ -9,17 +9,22 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { createServer } = require('http');
 
-// Try to load enhanced modules, fallback to basic if not available
-let ErrorHandler, GamePersistenceService;
+// Load enhanced modules with proper error handling
+let ErrorHandler, GamePersistenceService, AuthControllerComplete, AuthRoutesComplete;
 try {
   ErrorHandler = require('./middleware/error.middleware');
   GamePersistenceService = require('./services/game.persistence.service');
+  AuthControllerComplete = require('./controllers/auth.controller.complete');
+  AuthRoutesComplete = require('./routes/auth.routes.complete');
+  console.log('✅ Enhanced modules loaded successfully');
 } catch (error) {
-  console.log('⚠️ Enhanced modules not available, using basic mode');
+  console.log('⚠️ Some enhanced modules not available, using basic mode');
   ErrorHandler = { createOperationalError: (msg) => new Error(msg) };
   GamePersistenceService = { 
     initialize: async () => console.log('💾 Persistence service disabled')
   };
+  AuthControllerComplete = null;
+  AuthRoutesComplete = null;
 }
 
 const gnubgOfficialRoutes = require('./routes/gnubg-official.routes.js');
@@ -370,34 +375,62 @@ app.use('/api/gurubot', gurubotRoutes);
 // EasyBot Beginner AI Routes
 app.use('/api/easybot', easybotRoutes);
 
+// Complete Authentication Routes (15 endpoints)
+if (AuthRoutesComplete) {
+  app.use('/api/auth', AuthRoutesComplete.default);
+  console.log('🔐 Complete auth routes loaded');
+}
+
 // WebSocket management routes
 app.use('/api/ws', websocketRoutes);
 
-// 404 handler
+// 404 handler with updated endpoints
 app.use((req, res, next) => {
+  const availableEndpoints = [
+    '/health',
+    '/api/game/create-gnubg',
+    '/api/game/gnubg-move',
+    '/api/game/roll',
+    '/api/gnubg/analyze',
+    '/api/gnubg/move-analysis',
+    '/api/gnubg/evaluate',
+    '/api/user/profile/:email',
+    '/api/user/profile/:id',
+    '/api/stats/games',
+    '/api/gnubg/official/*',
+    '/api/gurubot/*',
+    '/api/easybot/*',
+    '/api/ws/stats',
+    '/api/ws/notify/:userId',
+    '/api/ws/broadcast/game/:id',
+    '/api/ws/broadcast/chat/:id'
+  ];
+
+  // Add auth endpoints if available
+  if (AuthRoutesComplete) {
+    availableEndpoints.push(
+      '/api/auth/register',
+      '/api/auth/login',
+      '/api/auth/refresh',
+      '/api/auth/profile',
+      '/api/auth/logout',
+      '/api/auth/account',
+      '/api/auth/check-email',
+      '/api/auth/check-username',
+      '/api/auth/forgot-password',
+      '/api/auth/reset-password',
+      '/api/auth/verify-email',
+      '/api/auth/sessions',
+      '/api/auth/sessions/:id',
+      '/api/auth/change-password'
+    );
+  }
+
   res.status(404).json({
     success: false,
     error: 'Not found',
     message: `Endpoint ${req.originalUrl} not found`,
-    available_endpoints: [
-      '/health',
-      '/api/game/create-gnubg',
-      '/api/game/gnubg-move',
-      '/api/game/roll',
-      '/api/gnubg/analyze',
-      '/api/gnubg/move-analysis',
-      '/api/gnubg/evaluate',
-      '/api/user/profile/:email',
-      '/api/user/profile/:id',
-      '/api/stats/games',
-      '/api/gnubg/official/*',
-      '/api/gurubot/*',
-      '/api/easybot/*',
-      '/api/ws/stats',
-      '/api/ws/notify/:userId',
-      '/api/ws/broadcast/game/:id',
-      '/api/ws/broadcast/chat/:id'
-    ]
+    available_endpoints: availableEndpoints
   });
   return;
 });

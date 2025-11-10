@@ -174,13 +174,40 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ 
           error: 'Failed to create user',
           details: createError.message,
-          code: createError.code
         })
       };
     }
 
-    // Retourner succès (sans mot de passe)
-    const { password: _, ...userResponse } = newUser;
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create user
+    const user = await prisma.users.create({
+      data: {
+        id: uuidv4(),
+        email: email.toLowerCase(),
+        username: username.toLowerCase(),
+        password_hash: hashedPassword,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        elo: 1500,
+        subscription_type: 'FREE',
+        is_active: true,
+        email_verified: false,
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+    });
+
+    // Generate access token
+    const accessToken = jwt.sign(
+      { userId: user.id, type: 'access' },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // Remove password from response
+    const { password_hash, ...userWithoutPassword } = user;
 
     return {
       statusCode: 201,
@@ -188,8 +215,10 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         message: 'User registered successfully',
-        data: {
-          user: userResponse
+        user: userWithoutPassword,
+        tokens: {
+          accessToken,
+          expiresIn: 3600
         }
       })
     };

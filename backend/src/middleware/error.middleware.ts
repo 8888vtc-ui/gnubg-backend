@@ -101,13 +101,26 @@ export class ErrorHandler {
   private static formatErrorResponse(error: ApiError, req: Request): any {
     const isDevelopment = process.env.NODE_ENV === 'development';
     
+    interface ErrorDetail {
+      code: string;
+      message: string;
+      timestamp: string;
+      debug?: {
+        stack?: string;
+        context?: Record<string, any>;
+        statusCode?: number;
+      };
+      retryable?: boolean;
+      maxRetries?: number;
+    }
+    
     const baseResponse = {
       success: false,
       error: {
         code: error.name || 'INTERNAL_ERROR',
         message: error.isOperational ? error.message : 'Internal server error',
         timestamp: new Date().toISOString()
-      },
+      } as ErrorDetail,
       requestId: req.headers['x-request-id'] || 'unknown'
     };
 

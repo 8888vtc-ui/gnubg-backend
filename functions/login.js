@@ -122,26 +122,35 @@ exports.handler = async (event, context) => {
       { expiresIn: '24h' }
     );
 
-    // Mettre à jour last_login
+    const refreshToken = jwt.sign(
+      { userId: user.id, type: 'refresh' },
+      JWT_REFRESH_SECRET,
+      { expiresIn: rememberMe ? '30d' : '7d' }
+    );
+
+    // Store refresh token (would need to connect to main backend DB)
+    // For now, return tokens directly
+
+    // Remove password from response
+    const { password_hash, ...userWithoutPassword } = user;
+
+    // Update last login
     await supabase
       .from('users')
       .update({ lastLoginAt: new Date().toISOString() })
       .eq('id', user.id);
 
-    // Retourner succès
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        data: {
-          token,
-          user: {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            level: user.level,
-            elo: user.elo,
+        message: 'Login successful',
+        user: userWithoutPassword,
+        tokens: {
+          accessToken,
+          refreshToken,
+          expiresIn: rememberMe ? 2592000 : 604800
             subscriptionType: user.subscriptionType,
             avatar: user.avatar,
             emailVerified: user.emailVerified
