@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import apiService from '@/services/api.service.js';
+import apiService from '@/services/api.service';
 
 const router = useRouter();
 const email = ref('');
