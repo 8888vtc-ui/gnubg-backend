@@ -81,38 +81,33 @@ exports.handler = async (event, context) => {
       .from('users')
       .select('*')
       .eq('email', email)
-      .single();
 
-    if (error || !user) {
+    if (!user || !user.is_active) {
       return {
         statusCode: 401,
         headers,
-        body: JSON.stringify({ error: 'Invalid credentials' })
+        body: JSON.stringify({
+          success: false,
+          error: 'Invalid credentials'
+        })
       };
     }
 
-    // Vérifier si utilisateur est actif
-    if (!user.isActive) {
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    if (!isValidPassword) {
       return {
         statusCode: 401,
         headers,
-        body: JSON.stringify({ error: 'Account deactivated' })
+        body: JSON.stringify({
+          success: false,
+          error: 'Invalid credentials'
+        })
       };
     }
 
-    // Validation mot de passe
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ error: 'Invalid credentials' })
-      };
-    }
-
-    // Générer JWT token
-    const token = jwt.sign(
+    // Generate tokens
+    const accessToken = jwt.sign(
       { 
         userId: user.id, 
         email: user.email,
@@ -124,21 +119,12 @@ exports.handler = async (event, context) => {
 
     const refreshToken = jwt.sign(
       { userId: user.id, type: 'refresh' },
-      JWT_REFRESH_SECRET,
+      process.env.JWT_REFRESH_SECRET,
       { expiresIn: rememberMe ? '30d' : '7d' }
     );
 
-    // Store refresh token (would need to connect to main backend DB)
-    // For now, return tokens directly
-
     // Remove password from response
     const { password_hash, ...userWithoutPassword } = user;
-
-    // Update last login
-    await supabase
-      .from('users')
-      .update({ lastLoginAt: new Date().toISOString() })
-      .eq('id', user.id);
 
     return {
       statusCode: 200,
@@ -151,10 +137,6 @@ exports.handler = async (event, context) => {
           accessToken,
           refreshToken,
           expiresIn: rememberMe ? 2592000 : 604800
-            subscriptionType: user.subscriptionType,
-            avatar: user.avatar,
-            emailVerified: user.emailVerified
-          }
         }
       })
     };

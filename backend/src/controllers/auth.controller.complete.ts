@@ -63,7 +63,7 @@ export class AuthController {
       }
 
       // Check if user already exists
-      const existingUser = await prisma.users.findFirst({
+      const existingUser = await prisma.user.findFirst({
         where: {
           OR: [
             { email: email.toLowerCase() },
@@ -81,7 +81,7 @@ export class AuthController {
       const hashedPassword = await bcrypt.hash(password, this.BCRYPT_ROUNDS);
 
       // Create user
-      const user = await prisma.users.create({
+      const user = await prisma.user.create({
         data: {
           id: uuidv4(),
           email: email.toLowerCase(),
@@ -103,7 +103,7 @@ export class AuthController {
       const refreshToken = this.generateRefreshToken(user.id);
 
       // Store refresh token
-      await prisma.user_sessions.create({
+      await prisma.userSession.create({
         data: {
           id: uuidv4(),
           user_id: user.id,
@@ -144,7 +144,7 @@ export class AuthController {
       }
 
       // Find user
-      const user = await prisma.users.findUnique({
+      const user = await prisma.user.findUnique({
         where: { email: email.toLowerCase() }
       });
 
