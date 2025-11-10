@@ -12,6 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Ensure TypeScript binary has execute permissions
+RUN chmod +x ./node_modules/.bin/tsc
+
 # Build the application
 RUN npm run build
 
