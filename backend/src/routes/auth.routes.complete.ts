@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { AuthController } from '../controllers/auth.controller.fixed';
+import { AuthController } from '../controllers/auth.controller.schema';
 import { ErrorHandler } from '../middleware/error.middleware';
 import { authMiddleware } from '../middleware/auth.middleware';
 

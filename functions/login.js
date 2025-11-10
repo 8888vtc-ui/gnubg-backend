@@ -76,13 +76,12 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Recherche utilisateur dans Supabase
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
+    // Find user in database (schema uses 'users' table)
+    const user = await prisma.users.findUnique({
+      where: { email: email.toLowerCase() }
+    });
 
-    if (!user || !user.is_active) {
+    if (!user || !user.isActive) {
       return {
         statusCode: 401,
         headers,
@@ -93,8 +92,8 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    // Verify password (schema uses 'password' field)
+    const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return {
         statusCode: 401,

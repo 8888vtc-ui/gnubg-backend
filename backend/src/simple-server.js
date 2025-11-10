@@ -14,7 +14,7 @@ let ErrorHandler, GamePersistenceService, AuthControllerComplete, AuthRoutesComp
 try {
   ErrorHandler = require('./middleware/error.middleware');
   GamePersistenceService = require('./services/game.persistence.service');
-  AuthControllerComplete = require('./controllers/auth.controller.complete');
+  AuthControllerComplete = require('./controllers/auth.controller.schema');
   AuthRoutesComplete = require('./routes/auth.routes.complete');
   console.log('✅ Enhanced modules loaded successfully');
 } catch (error) {
