@@ -1,41 +1,11 @@
 // src/controllers/gameController.ts
-// @ts-nocheck - Désactiver les vérifications strictes pour le contrôleur de jeu
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, GameMode, GameStatus } from '@prisma/client';
 import { AuthRequest } from '../middleware/authMiddleware';
-import { GameService } from '../services/gameService';
-import { 
-  Game, 
-  GameState, 
-  CreateGameRequest, 
-  JoinGameRequest, 
-  MakeMoveRequest,
-  createGame,
-  startGame,
-  finishGame,
-  isGameAvailable,
-  createInitialGameState
-} from '../types/game';
 
 const prisma = new PrismaClient();
 
-// Convertir Prisma Game vers Game interface
-function prismaGameToGame(prismaGame: any, player1: any, player2: any = null): Game {
-  return {
-    id: prismaGame.id,
-    player1,
-    player2,
-    status: prismaGame.status as any,
-    gameType: prismaGame.gameType as any,
-    stake: prismaGame.stake,
-    winner: prismaGame.winnerId === player1.id ? player1 : player2,
-    createdAt: prismaGame.createdAt,
-    startedAt: prismaGame.startedAt,
-    finishedAt: prismaGame.finishedAt
-  };
-}
-
-// Créer une nouvelle partie
+// Create a new game
 export const createGameController = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) {
@@ -45,58 +15,41 @@ export const createGameController = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const { gameType, stake }: CreateGameRequest = req.body;
+    const { gameMode, difficulty }: { gameMode?: GameMode; difficulty?: string } = req.body;
 
-    // Validation
-    if (!gameType || !stake) {
-      return res.status(400).json({
-        success: false,
-        error: 'Game type and stake are required'
-      });
-    }
-
-    if (!['match', 'money_game', 'tournament'].includes(gameType)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid game type'
-      });
-    }
-
-    if (stake < 0 || stake > 10000) {
-      return res.status(400).json({
-        success: false,
-        error: 'Stake must be between 0 and 10000'
-      });
-    }
-
-    // Récupérer le joueur
-    const player = await prisma.player.findUnique({
-      where: { id: req.user.id }
-    });
-
-    if (!player) {
-      return res.status(404).json({
-        success: false,
-        error: 'Player not found'
-      });
-    }
-
-    // Créer la partie en base
-    const prismaGame = await prisma.game.create({
+    // Create game with user as white player (for AI vs Player mode)
+    const game = await prisma.games.create({
       data: {
-        player1Id: player.id,
-        gameType,
-        stake,
-        status: 'waiting'
+        white_player_id: req.user.id,
+        gameMode: gameMode || GameMode.AI_VS_PLAYER,
+        status: GameStatus.WAITING,
+        board_state: "4HPwATDgc/ABMA", // Standard backgammon starting position
+        current_player: "WHITE"
+      },
+      include: {
+        users_games_white_player_idTousers: {
+          select: {
+            id: true,
+            username: true,
+            elo: true
+          }
+        }
       }
     });
 
-    // Créer l'objet Game complet
-    const game = prismaGameToGame(prismaGame, player);
-
     res.status(201).json({
       success: true,
-      data: game
+      data: {
+        game: {
+          id: game.id,
+          whitePlayer: game.users_games_white_player_idTousers,
+          status: game.status,
+          gameMode: game.gameMode,
+          boardState: game.board_state,
+          currentPlayer: game.current_player,
+          createdAt: game.createdAt
+        }
+      }
     });
   } catch (error) {
     console.error('Create game error:', error);
@@ -107,71 +60,31 @@ export const createGameController = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// Lister les parties disponibles
-export const listAvailableGames = async (req: AuthRequest, res: Response) => {
+// Get game status
+export const getGameStatus = async (req: AuthRequest, res: Response) => {
   try {
-    const availableGames = await prisma.game.findMany({
-      where: {
-        status: 'waiting',
-        player2Id: null
-      },
+    const { gameId } = req.params;
+
+    const game = await prisma.games.findUnique({
+      where: { id: gameId },
       include: {
-        player1: {
+        users_games_white_player_idTousers: {
           select: {
             id: true,
-            name: true,
-            email: true,
-            points: true
+            username: true,
+            elo: true
           }
+        },
+        users_games_black_player_idTousers: {
+          select: {
+            id: true,
+            username: true,
+            elo: true
+          }
+        },
+        game_moves: {
+          orderBy: { createdAt: 'asc' }
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    const games = availableGames.map(prismaGame => 
-      prismaGameToGame(prismaGame, prismaGame.player1)
-    );
-
-    res.json({
-      success: true,
-      data: games
-    });
-  } catch (error) {
-    console.error('List games error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to list games'
-    });
-  }
-};
-
-// Rejoindre une partie
-export const joinGame = async (req: AuthRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const { gameId }: JoinGameRequest = req.body;
-
-    if (!gameId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Game ID is required'
-      });
-    }
-
-    // Vérifier que la partie existe et est disponible
-    const game = await prisma.game.findUnique({
-      where: { id: parseInt(gameId) },
-      include: {
-        player1: true,
-        player2: true
       }
     });
 
@@ -182,326 +95,161 @@ export const joinGame = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    if (game.status !== 'waiting' || game.player2Id !== null) {
-      return res.status(400).json({
-        success: false,
-        error: 'Game is not available'
-      });
-    }
-
-    if (game.player1Id === req.user.id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Cannot join your own game'
-      });
-    }
-
-    // Vérifier que le joueur a assez de points
-    const player = await prisma.player.findUnique({
-      where: { id: req.user.id }
-    });
-
-    if (!player || player.points < game.stake) {
-      return res.status(400).json({
-        success: false,
-        error: 'Insufficient points to join this game'
-      });
-    }
-
-    // Démarrer la partie avec le service
-    const gameState = await GameService.startGame(parseInt(gameId), req.user.id);
-
     res.json({
       success: true,
-      data: gameState
-    });
-  } catch (error) {
-    console.error('Join game error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to join game'
-    });
-  }
-};
-
-// Obtenir les détails d'une partie
-export const getGameDetails = async (req: AuthRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const gameIdParam = req.params.gameId;
-
-    if (!gameIdParam) {
-      return res.status(400).json({
-        success: false,
-        error: 'Game ID is required'
-      });
-    }
-
-    const gameId = parseInt(gameIdParam);
-
-    if (isNaN(gameId)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid game ID'
-      });
-    }
-
-    const gameState = await GameService.loadGameState(gameId);
-
-    if (!gameState) {
-      return res.status(404).json({
-        success: false,
-        error: 'Game not found'
-      });
-    }
-
-    // Vérifier que l'utilisateur est un des joueurs
-    const player1Id = parseInt(gameState.player1.id);
-    const player2Id = gameState.player2 ? parseInt(gameState.player2.id) : null;
-    
-    if (player1Id !== req.user.id && (!player2Id || player2Id !== req.user.id)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied: You are not a player in this game'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: gameState
-    });
-  } catch (error) {
-    console.error('Get game details error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get game details'
-    });
-  }
-};
-
-// Lister les parties de l'utilisateur
-export const listUserGames = async (req: AuthRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const userGames = await prisma.game.findMany({
-      where: {
-        OR: [
-          { player1Id: req.user.id },
-          { player2Id: req.user.id }
-        ]
-      },
-      include: {
-        player1: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            points: true
-          }
+      data: {
+        game: {
+          id: game.id,
+          whitePlayer: game.users_games_white_player_idTousers,
+          blackPlayer: game.users_games_black_player_idTousers,
+          status: game.status,
+          gameMode: game.gameMode,
+          boardState: game.board_state,
+          currentPlayer: game.current_player,
+          dice: game.dice,
+          whiteScore: game.white_score,
+          blackScore: game.black_score,
+          winner: game.winner,
+          createdAt: game.createdAt
         },
-        player2: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            points: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
+        moves: game.game_moves
+      }
+    });
+  } catch (error) {
+    console.error('Get game status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get game status'
+    });
+  }
+};
+
+// Roll dice
+export const rollDice = async (req: AuthRequest, res: Response) => {
+  try {
+    const { gameId } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    // Generate random dice rolls
+    const dice = [
+      Math.floor(Math.random() * 6) + 1,
+      Math.floor(Math.random() * 6) + 1
+    ];
+
+    // Update game with dice roll
+    const game = await prisma.games.update({
+      where: { id: gameId },
+      data: {
+        dice: dice,
+        status: GameStatus.PLAYING
       }
     });
 
-    const games = userGames.map(prismaGame => 
-      prismaGameToGame(prismaGame, prismaGame.player1, prismaGame.player2)
-    );
-
     res.json({
       success: true,
-      data: games
-    });
-  } catch (error) {
-    console.error('List user games error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to list user games'
-    });
-  }
-};
-
-// Faire un mouvement dans une partie
-export const makeMove = async (req: AuthRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const gameIdParam = req.params.gameId;
-    
-    if (!gameIdParam) {
-      return res.status(400).json({
-        success: false,
-        error: 'Game ID is required'
-      });
-    }
-
-    const gameId = parseInt(gameIdParam);
-    const { from, to, diceUsed }: MakeMoveRequest = req.body;
-
-    // Validation
-    if (typeof from !== 'number' || typeof to !== 'number' || typeof diceUsed !== 'number') {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid move parameters'
-      });
-    }
-
-    if (diceUsed < 1 || diceUsed > 6) {
-      return res.status(400).json({
-        success: false,
-        error: 'Dice value must be between 1 and 6'
-      });
-    }
-
-    // Faire le mouvement via le service
-    const updatedGameState = await GameService.makeMove(gameId, req.user.id, { from, to, diceUsed });
-
-    res.json({
-      success: true,
-      data: updatedGameState
-    });
-  } catch (error) {
-    console.error('Make move error:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to make move'
-    });
-  }
-};
-
-// Lancer les dés
-export const rollDice = async (req: AuthRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const gameIdParam = req.params.gameId;
-    
-    if (!gameIdParam) {
-      return res.status(400).json({
-        success: false,
-        error: 'Game ID is required'
-      });
-    }
-
-    const gameId = parseInt(gameIdParam);
-
-    // Lancer les dés via le service
-    const diceState = await GameService.rollDice(gameId, req.user.id);
-
-    res.json({
-      success: true,
-      data: diceState
+      data: {
+        dice: dice
+      }
     });
   } catch (error) {
     console.error('Roll dice error:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to roll dice'
+      error: 'Failed to roll dice'
     });
   }
 };
 
-// Obtenir les mouvements possibles
+// Make a move
+export const makeMove = async (req: AuthRequest, res: Response) => {
+  try {
+    const { gameId } = req.params;
+    const { from, to }: { from: number; to: number } = req.body;
+
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    // Record the move
+    await prisma.game_moves.create({
+      data: {
+        game_id: gameId,
+        user_id: req.user.id,
+        from_point: from,
+        to_point: to
+      }
+    });
+
+    // For now, just acknowledge the move
+    // In a real implementation, this would validate the move and update board state
+    res.json({
+      success: true,
+      data: {
+        message: 'Move recorded',
+        from: from,
+        to: to
+      }
+    });
+  } catch (error) {
+    console.error('Make move error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to make move'
+    });
+  }
+};
+
+// Placeholder functions for routes that exist but aren't fully implemented yet
+export const listAvailableGames = async (req: AuthRequest, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      games: [],
+      message: 'Available games feature coming soon'
+    }
+  });
+};
+
+export const joinGame = async (req: AuthRequest, res: Response) => {
+  res.json({
+    success: false,
+    error: 'Join game feature coming soon'
+  });
+};
+
+export const getGameDetails = async (req: AuthRequest, res: Response) => {
+  res.json({
+    success: false,
+    error: 'Game details feature coming soon'
+  });
+};
+
+export const listUserGames = async (req: AuthRequest, res: Response) => {
+  res.json({
+    success: false,
+    error: 'User games feature coming soon'
+  });
+};
+
 export const getAvailableMoves = async (req: AuthRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const gameIdParam = req.params.gameId;
-    
-    if (!gameIdParam) {
-      return res.status(400).json({
-        success: false,
-        error: 'Game ID is required'
-      });
-    }
-
-    const gameId = parseInt(gameIdParam);
-
-    // Obtenir les mouvements possibles via le service
-    const availableMoves = await GameService.getAvailableMoves(gameId, req.user.id);
-
-    res.json({
-      success: true,
-      data: availableMoves
-    });
-  } catch (error) {
-    console.error('Get available moves error:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to get available moves'
-    });
-  }
+  res.json({
+    success: false,
+    error: 'Available moves feature coming soon'
+  });
 };
 
-// Obtenir le pip count
 export const getPipCount = async (req: AuthRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const gameIdParam = req.params.gameId;
-    
-    if (!gameIdParam) {
-      return res.status(400).json({
-        success: false,
-        error: 'Game ID is required'
-      });
-    }
-
-    const gameId = parseInt(gameIdParam);
-
-    // Calculer le pip count via le service
-    const pipCount = await GameService.getPipCount(gameId);
-
-    res.json({
-      success: true,
-      data: pipCount
-    });
-  } catch (error) {
-    console.error('Get pip count error:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to get pip count'
-    });
-  }
+  res.json({
+    success: false,
+    error: 'Pip count feature coming soon'
+  });
 };
