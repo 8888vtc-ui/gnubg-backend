@@ -7,7 +7,8 @@
     "target": "es2020",
     "types": ["node"],
     "skipLibCheck": true,
-    "strict": false
+    "strict": false,
+    "strictNullChecks": true
   },
   "include": [
     "src/**/*"
