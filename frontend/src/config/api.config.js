@@ -11,13 +11,13 @@ const API_CONFIG = {
     timeout: 10000
   },
   
-  // Production Netlify + Railway
+  // Production Render (PRIMARY)
   production: {
-    baseURL: 'https://gammon-guru-backend.railway.app',
+    baseURL: 'https://gammon-guru-api.onrender.com',
     timeout: 15000
   },
   
-  // Fallback si Railway down
+  // Fallback si Render down
   fallback: {
     baseURL: 'https://gnubg-backend.netlify.app/api',
     timeout: 15000
@@ -32,13 +32,14 @@ export const API_ENDPOINTS = {
   // Auth (priorité 1)
   LOGIN: '/api/auth/login',
   REGISTER: '/api/auth/register',
+  LOGOUT: '/api/auth/logout',
   PROFILE: '/api/user/profile',
   
   // Game (priorité 1)
-  CREATE_GAME: '/api/game/create',
-  GAME_STATUS: '/api/game/status',
-  ROLL_DICE: '/api/game/roll',
-  MAKE_MOVE: '/api/game/move',
+  CREATE_GAME: '/api/games',
+  GAME_STATUS: '/api/games',
+  ROLL_DICE: '/api/games',
+  MAKE_MOVE: '/api/games',
   
   // GNUBG (priorité 2)
   ANALYZE: '/api/gnubg/analyze',
@@ -95,10 +96,10 @@ class ApiClient {
     })
   }
   
-  async createGame(mode = 'AI_VS_PLAYER', difficulty = 'MEDIUM') {
+  async createGame(gameMode = 'AI_VS_PLAYER', difficulty = 'MEDIUM') {
     return this.request(API_ENDPOINTS.CREATE_GAME, {
       method: 'POST',
-      body: JSON.stringify({ mode, difficulty })
+      body: JSON.stringify({ gameMode, difficulty })
     })
   }
   
@@ -107,16 +108,15 @@ class ApiClient {
   }
   
   async rollDice(gameId) {
-    return this.request(API_ENDPOINTS.ROLL_DICE, {
-      method: 'POST',
-      body: JSON.stringify({ gameId })
+    return this.request(`${API_ENDPOINTS.ROLL_DICE}/${gameId}/roll`, {
+      method: 'POST'
     })
   }
   
   async makeMove(gameId, from, to) {
-    return this.request(API_ENDPOINTS.MAKE_MOVE, {
+    return this.request(`${API_ENDPOINTS.MAKE_MOVE}/${gameId}/move`, {
       method: 'POST',
-      body: JSON.stringify({ gameId, from, to })
+      body: JSON.stringify({ from, to })
     })
   }
   

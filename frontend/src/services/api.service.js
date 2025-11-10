@@ -7,17 +7,20 @@ class ApiService {
   constructor() {
     // Determine base URL based on environment
     this.isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    this.baseUrl = this.isDev ? 
-      (import.meta.env.VITE_DEV_API_BASE_URL || 'http://localhost:3000') : 
-      (import.meta.env.VITE_API_BASE_URL || 'https://your-backend-url.railway.app');
-    
+    this.baseUrl = this.isDev ?
+      (import.meta.env.VITE_DEV_API_BASE_URL || 'http://localhost:3000') :
+      (import.meta.env.VITE_API_BASE_URL || 'https://gammon-guru-api.onrender.com');
+
+    // JWT token storage
+    this.token = localStorage.getItem('authToken') || null;
+
     // API Keys - SECURE: Only backend should have access
     this.apiKeys = {
       claude: null, // Removed for security - use backend proxy
       openai: null, // Removed for security - use backend proxy
       replicate: null // Removed for security - use backend proxy
     };
-    
+
     // Feature flags
     this.features = {
       claude: import.meta.env.VITE_ENABLE_CLAUDE === 'true',
@@ -40,18 +43,82 @@ class ApiService {
       ...options
     };
 
+    // Add JWT token if available
+    if (this.token) {
+      config.headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Authentication methods
+   */
+  async login(email, password) {
+    const response = await this.request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+
+    if (response.success && response.data.token) {
+      this.setToken(response.data.token);
+    }
+
+    return response;
+  }
+
+  async register(name, email, password) {
+    const response = await this.request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password })
+    });
+
+    if (response.success && response.data.token) {
+      this.setToken(response.data.token);
+    }
+
+    return response;
+  }
+
+  async logout() {
+    const response = await this.request('/api/auth/logout', {
+      method: 'POST'
+    });
+
+    this.clearToken();
+    return response;
+  }
+
+  async getProfile() {
+    return this.request('/api/user/profile');
+  }
+
+  /**
+   * Token management
+   */
+  setToken(token) {
+    this.token = token;
+    localStorage.setItem('authToken', token);
+  }
+
+  clearToken() {
+    this.token = null;
+    localStorage.removeItem('authToken');
+  }
+
+  isAuthenticated() {
+    return !!this.token;
   }
 
   /**
@@ -65,17 +132,38 @@ class ApiService {
     return this.request('/api/ws/stats');
   }
 
-  async createGame(gameData) {
-    return this.request('/api/game/create-gnubg', {
+  async createGame(gameData = {}) {
+    const data = {
+      gameMode: gameData.gameMode || 'AI_VS_PLAYER',
+      difficulty: gameData.difficulty || 'MEDIUM',
+      ...gameData
+    };
+
+    return this.request('/api/games', {
       method: 'POST',
-      body: JSON.stringify(gameData)
+      body: JSON.stringify(data)
     });
   }
 
-  async rollDice() {
-    return this.request('/api/game/roll', {
+  async getGameStatus(gameId) {
+    return this.request(`/api/games/${gameId}`);
+  }
+
+  async rollDice(gameId) {
+    return this.request(`/api/games/${gameId}/roll`, {
       method: 'POST'
     });
+  }
+
+  async makeMove(gameId, from, to) {
+    return this.request(`/api/games/${gameId}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ from, to })
+    });
+  }
+
+  async getPlayers() {
+    return this.request('/api/players');
   }
 
   async getGnubgAnalysis(positionData) {
