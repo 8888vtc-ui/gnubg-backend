@@ -61,6 +61,16 @@ const router = createRouter({
       // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
     },
+    {
+      path: '/multiplayer',
+      name: 'multiplayer',
+      component: () => import('../views/MultiplayerGameView.vue'),
+    },
+    {
+      path: '/claude-assistant',
+      name: 'claude-assistant',
+      component: () => import('../views/ClaudeAssistantView.vue'),
+    },
   ],
 })
 

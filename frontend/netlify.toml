@@ -1,0 +1,51 @@
+# Netlify configuration for GammonGuru Frontend
+
+[build]
+  # Directory to build from
+  base = "frontend/"
+  # Directory to publish (build output)
+  publish = "dist/"
+  # Build command
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_VERSION = "10"
+
+# Redirects for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for security and performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# API proxy configuration (if needed for development)
+[[redirects]]
+  from = "/api/*"
+  to = "https://your-backend-url.railway.app/api/:splat"
+  status = 200
+  force = true
+
+# WebSocket proxy (note: Netlify doesn't support WebSocket proxy directly)
+# This will need to be handled by the client connecting directly to backend
+
+# Environment variables (set in Netlify dashboard)
+# VITE_API_BASE_URL=https://your-backend-url.railway.app
+# VITE_WS_BASE_URL=wss://your-backend-url.railway.app
+# VITE_CLAUDE_API_KEY=your-claude-api-key
+# VITE_OPENAI_API_KEY=your-openai-api-key
+# VITE_REPLICATE_API_TOKEN=your-replicate-token

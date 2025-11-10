@@ -64,16 +64,25 @@ class WebSocketClient {
   }
 
   /**
-   * Build WebSocket URL with authentication
+   * Build WebSocket URL based on type and environment
    */
   buildWebSocketUrl(type, resourceId, token) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
+    // Determine base URL based on environment
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const baseUrl = isDev ? 
+      (import.meta.env.VITE_DEV_WS_BASE_URL || 'ws://localhost:3000') : 
+      (import.meta.env.VITE_WS_BASE_URL || 'wss://your-production-url.com');
     
-    // For development, use Railway backend
-    const wsHost = host.includes('localhost') ? 'gammon-guru-backend.railway.app' : host;
+    // Build endpoint based on type
+    const endpoints = {
+      'notifications': '/ws/notifications',
+      'game': `/ws/game/${resourceId}`,
+      'chat': `/ws/chat/${resourceId}`,
+      'tournament': `/ws/tournament/${resourceId}`
+    };
     
-    return `${protocol}//${wsHost}/ws/${type}/${resourceId}?token=${encodeURIComponent(token)}`;
+    const endpoint = endpoints[type] || '/ws/notifications';
+    return `${baseUrl}${endpoint}?token=${token}`;
   }
 
   /**

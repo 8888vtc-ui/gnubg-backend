@@ -72,7 +72,7 @@ const handleClick = () => {
 }
 
 const startDrag = (event: MouseEvent | TouchEvent) => {
-  if (!props.dragaggable || !props.canMove) return
+  if (!props.draggable || !props.canMove) return
   
   event.preventDefault()
   isDragging.value = true

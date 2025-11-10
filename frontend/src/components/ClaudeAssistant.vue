@@ -268,9 +268,10 @@
   </div>
 </template>
 
-<script>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+<script setup>
+import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useGameStore } from '@/stores/game'
+import apiService from '@/services/api.service'
 import { useUserStore } from '@/stores/user'
 
 export default {

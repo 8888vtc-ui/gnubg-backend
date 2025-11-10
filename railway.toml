@@ -1,0 +1,53 @@
+# Railway configuration for GammonGuru Backend
+
+[build]
+  # Build command
+  builder = "NIXPACKS"
+
+[deploy]
+  # Start command
+  startCommand = "cd backend/src && node simple-server.js"
+  # Health check path
+  healthcheckPath = "/health"
+  # Health check timeout
+  healthcheckTimeout = 100
+  # Restart policy
+  restartPolicyType = "ON_FAILURE"
+
+[env]
+  # Node.js environment
+  NODE_ENV = "production"
+  # Server port (Railway provides PORT env var)
+  # PORT is automatically set by Railway
+  
+  # JWT Configuration
+  JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production"
+  
+  # AI API Keys
+  ANTHROPIC_API_KEY = "your-claude-api-key-here"
+  OPENAI_API_KEY = "your-openai-api-key-here"
+  REPLICATE_API_TOKEN = "your-replicate-api-token-here"
+
+# Service configuration
+[[services]]
+  name = "gammon-guru-backend"
+  
+  [services.http]
+    # HTTP port mapping
+    internal_port = 3000
+    
+  [services.http.health_check]
+    # Health check configuration
+    path = "/health"
+    port = 3000
+    check_interval = 30
+    timeout = 10
+    grace_period = 10
+
+# Scaling configuration
+[scale]
+  # Auto-scaling settings
+  min_instances = 1
+  max_instances = 3
+  threshold_cpu = 75
+  threshold_memory = 75
