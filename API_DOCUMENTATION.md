@@ -219,6 +219,87 @@ Make a move in the game.
 
 ---
 
+## 🧠 AI Features Endpoints
+
+### GET `/api/ai/:gameId/suggestion`
+Get AI move suggestion for the current position.
+
+**Headers:** `Authorization: Bearer <jwt-token>`
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "suggestion": {
+      "from": 1,
+      "to": 5,
+      "reasoning": "Random legal move",
+      "confidence": 0.5
+    }
+  }
+}
+```
+
+### POST `/api/ai/:gameId/move`
+Make an AI move in the game.
+
+**Headers:** `Authorization: Bearer <jwt-token>`
+
+**Request Body:**
+```json
+{
+  "difficulty": "MEDIUM"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "move": {
+      "from": 12,
+      "to": 16,
+      "player": "BLACK"
+    },
+    "reasoning": "Random legal move",
+    "confidence": 0.5,
+    "difficulty": "MEDIUM"
+  }
+}
+```
+
+### GET `/api/ai/:gameId/analysis`
+Get AI analysis of the current position.
+
+**Headers:** `Authorization: Bearer <jwt-token>`
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "analysis": {
+      "positionStrength": "neutral",
+      "recommendedMoves": [],
+      "winProbability": {
+        "white": 45,
+        "black": 55
+      },
+      "advice": "Focus on getting your pieces into your home board"
+    },
+    "gameState": {
+      "currentPlayer": "WHITE",
+      "dice": [4, 2],
+      "status": "PLAYING"
+    }
+  }
+}
+```
+
+---
+
 ## 👥 Public Endpoints
 
 ### GET `/api/players`
@@ -343,6 +424,9 @@ curl https://gammon-guru-api.onrender.com/api/players
 - Game state retrieval
 - Dice rolling
 - Move recording
+- AI opponent moves
+- AI move suggestions
+- AI position analysis
 - Health monitoring
 - Database connectivity
 
@@ -353,9 +437,9 @@ curl https://gammon-guru-api.onrender.com/api/players
 
 ### 📝 Not Yet Implemented
 - Real-time multiplayer (WebSocket)
-- GNUBG AI integration
+- Advanced AI heuristics
 - Tournament system
-- Advanced game logic
+- Game replays
 
 ---
 

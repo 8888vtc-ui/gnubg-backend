@@ -15,7 +15,10 @@
 
         <div class="text-center">
           <div class="text-lg font-bold">{{ opponentName }}</div>
-          <div class="text-xs opacity-75">Turn: {{ game?.currentPlayer || 'WHITE' }}</div>
+          <div class="text-xs opacity-75">
+            Turn: {{ game?.currentPlayer || 'WHITE' }}
+            <span v-if="isAIThinking" class="text-blue-400 ml-2">🤖 Thinking...</span>
+          </div>
         </div>
 
         <div class="flex items-center space-x-2">
@@ -36,7 +39,8 @@
       <!-- Game Controls -->
       <div class="flex justify-between items-center mb-4">
         <div class="text-white text-sm">
-          <span v-if="isMyTurn" class="text-green-300 font-bold">✅ Your turn</span>
+          <span v-if="isAIThinking" class="text-blue-400 font-bold">🤖 AI is thinking...</span>
+          <span v-else-if="isMyTurn" class="text-green-300 font-bold">✅ Your turn</span>
           <span v-else class="text-yellow-300">⏳ Opponent's turn</span>
         </div>
 
@@ -258,6 +262,11 @@ const loadGame = async () => {
       game.value = response.data.game
       initializePiecesFromBoardState(response.data.game.boardState)
       emit('gameLoaded', response.data.game)
+
+      // If it's AI's turn, make AI move
+      if (game.value.gameMode === 'AI_VS_PLAYER' && game.value.currentPlayer !== 'WHITE') {
+        await makeAIMove()
+      }
     } else {
       error.value = response.error || 'Failed to load game'
     }
@@ -332,11 +341,48 @@ const rollDice = async () => {
 
     if (response.success) {
       game.value.dice = response.data.dice
+
+      // If it's AI vs Player and now it's AI's turn, make AI move
+      if (game.value.gameMode === 'AI_VS_PLAYER' && game.value.currentPlayer !== 'WHITE') {
+        setTimeout(() => makeAIMove(), 1000) // Delay for better UX
+      }
     } else {
       error.value = response.error || 'Failed to roll dice'
     }
   } catch (err: any) {
     error.value = 'Failed to roll dice: ' + err.message
+  }
+}
+
+const makeAIMove = async () => {
+  if (!game.value?.id) return
+
+  isAIThinking.value = true
+
+  try {
+    // Call AI move endpoint
+    const response = await fetch(`/api/ai/${game.value.id}/move`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+      },
+      body: JSON.stringify({ difficulty: 'MEDIUM' })
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      // Update game state with AI move
+      // For now, just reload the game state
+      await loadGame()
+    } else {
+      error.value = data.error || 'AI move failed'
+    }
+  } catch (err: any) {
+    error.value = 'AI move failed: ' + err.message
+  } finally {
+    isAIThinking.value = false
   }
 }
 

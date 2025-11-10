@@ -1,0 +1,276 @@
+// src/controllers/aiController.ts
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
+import { prisma } from '../server';
+import { AIService } from '../services/aiService';
+
+/**
+ * Make an AI move in a game
+ */
+export const makeAIMove = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    const { gameId } = req.params;
+    const { difficulty = 'MEDIUM' } = req.body;
+
+    const game = await prisma.games.findFirst({
+      where: {
+        id: gameId,
+        OR: [
+          { white_player_id: req.user.id },
+          { black_player_id: req.user.id }
+        ]
+      }
+    });
+
+    if (!game) {
+      return res.status(404).json({
+        success: false,
+        error: 'Game not found'
+      });
+    }
+
+    // Check if it's AI's turn
+    if (game.game_mode !== 'AI_VS_PLAYER') {
+      return res.status(400).json({
+        success: false,
+        error: 'This is not an AI game'
+      });
+    }
+
+    // Determine AI player (opposite of human)
+    const aiPlayer = game.white_player_id === req.user.id ? 'BLACK' : 'WHITE';
+
+    if (game.current_player !== aiPlayer) {
+      return res.status(400).json({
+        success: false,
+        error: 'It\'s not the AI\'s turn'
+      });
+    }
+
+    // Convert database game to GameState
+    const gameState = {
+      id: game.id,
+      whitePlayer: game.white_player_id ? { id: game.white_player_id } : null,
+      blackPlayer: game.black_player_id ? { id: game.black_player_id } : null,
+      boardState: game.board_state as number[],
+      currentPlayer: game.current_player,
+      dice: game.dice as number[],
+      usedDice: [],
+      whiteScore: game.white_score,
+      blackScore: game.black_score,
+      status: game.status,
+      gameMode: game.game_mode,
+      winner: game.winner,
+      createdAt: game.created_at,
+      updatedAt: game.updated_at
+    };
+
+    // Get AI move
+    const aiMove = AIService.getBestMove(gameState);
+
+    if (!aiMove) {
+      return res.status(400).json({
+        success: false,
+        error: 'AI cannot make a move (no legal moves available)'
+      });
+    }
+
+    // Simulate AI thinking time
+    await AIService.simulateThinking(1500);
+
+    // Execute the move (simplified logic)
+    const diceValue = Math.abs(aiMove.to - aiMove.from);
+    const hasDice = game.dice.includes(diceValue);
+
+    if (!hasDice) {
+      return res.status(400).json({
+        success: false,
+        error: 'AI selected invalid move'
+      });
+    }
+
+    // Update game state
+    await prisma.games.update({
+      where: { id: gameId },
+      data: {
+        dice: game.dice.filter(d => d !== diceValue),
+        current_player: game.current_player === 'WHITE' ? 'BLACK' : 'WHITE',
+        updated_at: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        move: {
+          from: aiMove.from,
+          to: aiMove.to,
+          player: aiPlayer
+        },
+        reasoning: aiMove.reasoning,
+        confidence: aiMove.confidence,
+        difficulty: difficulty
+      }
+    });
+
+  } catch (error) {
+    console.error('Error making AI move:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to make AI move'
+    });
+  }
+};
+
+/**
+ * Get AI move suggestion (for hints)
+ */
+export const getAIMoveSuggestion = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    const { gameId } = req.params;
+
+    const game = await prisma.games.findFirst({
+      where: {
+        id: gameId,
+        OR: [
+          { white_player_id: req.user.id },
+          { black_player_id: req.user.id }
+        ]
+      }
+    });
+
+    if (!game) {
+      return res.status(404).json({
+        success: false,
+        error: 'Game not found'
+      });
+    }
+
+    // Convert database game to GameState
+    const gameState = {
+      id: game.id,
+      whitePlayer: game.white_player_id ? { id: game.white_player_id } : null,
+      blackPlayer: game.black_player_id ? { id: game.black_player_id } : null,
+      boardState: game.board_state as number[],
+      currentPlayer: game.current_player,
+      dice: game.dice as number[],
+      usedDice: [],
+      whiteScore: game.white_score,
+      blackScore: game.black_score,
+      status: game.status,
+      gameMode: game.game_mode,
+      winner: game.winner,
+      createdAt: game.created_at,
+      updatedAt: game.updated_at
+    };
+
+    // Get AI suggestion
+    const aiMove = AIService.getBestMove(gameState);
+
+    if (!aiMove) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          message: 'No suggested moves available',
+          suggestion: null
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        suggestion: {
+          from: aiMove.from,
+          to: aiMove.to,
+          reasoning: aiMove.reasoning,
+          confidence: aiMove.confidence
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting AI suggestion:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get AI suggestion'
+    });
+  }
+};
+
+/**
+ * Get AI analysis of current position
+ */
+export const getAIAnalysis = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    const { gameId } = req.params;
+
+    const game = await prisma.games.findFirst({
+      where: {
+        id: gameId,
+        OR: [
+          { white_player_id: req.user.id },
+          { black_player_id: req.user.id }
+        ]
+      }
+    });
+
+    if (!game) {
+      return res.status(404).json({
+        success: false,
+        error: 'Game not found'
+      });
+    }
+
+    // Simple analysis response (can be expanded later)
+    const analysis = {
+      positionStrength: 'neutral',
+      recommendedMoves: [],
+      winProbability: {
+        white: 45,
+        black: 55
+      },
+      advice: 'Focus on getting your pieces into your home board'
+    };
+
+    res.json({
+      success: true,
+      data: {
+        analysis: analysis,
+        gameState: {
+          currentPlayer: game.current_player,
+          dice: game.dice,
+          status: game.status
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting AI analysis:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get AI analysis'
+    });
+  }
+};
