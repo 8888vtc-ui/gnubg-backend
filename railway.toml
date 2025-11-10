@@ -1,8 +1,9 @@
 # Railway configuration for GammonGuru Backend
 
 [build]
-  # Build command
-  builder = "NIXPACKS"
+  # Use Docker builder instead of Nixpacks for proper Prisma binary handling
+  builder = "DOCKER"
+  dockerfilePath = "Dockerfile"
 
 [deploy]
   # Start command - updated for current structure

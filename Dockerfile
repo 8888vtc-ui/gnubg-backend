@@ -9,6 +9,12 @@ COPY package*.json package-lock.json ./
 # Install all dependencies (including dev dependencies for build)
 RUN npm ci
 
+# Copy Prisma schema first (needed for generate)
+COPY prisma ./prisma/
+
+# Generate Prisma client with correct binaries for Railway
+RUN npx prisma generate
+
 # Copy source code
 COPY . .
 
@@ -18,8 +24,8 @@ RUN chmod +x ./node_modules/.bin/tsc
 # Build the application
 RUN npm run build
 
-# Remove dev dependencies for production
-RUN npm prune --production
+# Keep Prisma binaries even after pruning (they're needed at runtime)
+RUN npm prune --production && npm install --production
 
 # Expose port
 EXPOSE 3000
