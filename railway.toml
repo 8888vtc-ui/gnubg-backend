@@ -1,9 +1,11 @@
 # Railway configuration for GammonGuru Backend
 
 [build]
-  # Use Docker builder instead of Nixpacks for proper Prisma binary handling
+  # Use Docker builder with explicit build commands
   builder = "DOCKER"
   dockerfilePath = "Dockerfile"
+  # Additional build commands to ensure Prisma generation
+  buildCommand = "npm run postinstall"
 
 [deploy]
   # Start command - updated for current structure
