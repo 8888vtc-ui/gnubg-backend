@@ -313,9 +313,12 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
   logger.error('Application Error:', {
     message: error.message,
     stack: error.stack,
-    method: req.method,
-    ip: req.ip,
-    userId: (req as any).user?.id || 'anonymous'
+    request: {
+      method: req.method,
+      url: req.url,
+      ip: req.ip,
+      userId: (req as any).user?.id || 'anonymous'
+    }
   });
 
   if (!res.headersSent) {
