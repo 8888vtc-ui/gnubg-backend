@@ -214,6 +214,19 @@ model user_achievements {
   @@map("user_achievements")
 }
 
+model user_preferences {
+  id       String @id @default(cuid())
+  user_id  String @unique
+  language String @default("en") // Preferred language code
+  theme    String @default("light") // UI theme preference
+  sound    Boolean @default(true) // Sound effects enabled
+  notifications Boolean @default(true) // Push notifications
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
 model users {
   id                                 String                    @id
   email                              String                    @unique
