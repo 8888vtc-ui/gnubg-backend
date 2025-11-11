@@ -46,6 +46,13 @@
   to = "/.netlify/functions/learn"
   status = 200
 
+# WebSocket support (Note: Limited on Netlify - works in development/server mode)
+[[redirects]]
+  from = "/ws"
+  to = "/.netlify/functions/ws"
+  status = 200
+  force = true
+
 [build.environment]
   NODE_VERSION = "18"
   # Global environment optimizations
