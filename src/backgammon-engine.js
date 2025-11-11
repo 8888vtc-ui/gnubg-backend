@@ -364,6 +364,71 @@ class BackgammonGame {
     return cloned
   }
 
+  // Convert internal point (0-23) to GNUBG point (1-24)
+  pointToGNUBG(point) {
+    return point + 1
+  }
+
+  // Convert GNUBG point (1-24) to internal point (0-23)
+  gnubgToPoint(gnubgPoint) {
+    return gnubgPoint - 1
+  }
+
+  // Convert move to GNUBG notation
+  moveToGNUBGNotation(move) {
+    let fromNotation, toNotation
+
+    // Convert from point
+    if (move.from === 'bar') {
+      fromNotation = 'bar'
+    } else {
+      fromNotation = this.pointToGNUBG(move.from).toString()
+    }
+
+    // Convert to point
+    if (move.type === 'bear_off') {
+      toNotation = 'off'
+    } else {
+      toNotation = this.pointToGNUBG(move.to).toString()
+    }
+
+    // Add hit indicator
+    const hitIndicator = move.type === 'hit' ? '*' : ''
+
+    return `${fromNotation}/${toNotation}${hitIndicator}`
+  }
+
+  // Parse GNUBG notation to internal move
+  parseGNUBGNotation(notation, player) {
+    const parts = notation.replace('*', '').split('/')
+    let from, to
+
+    // Parse from point
+    if (parts[0] === 'bar') {
+      from = 'bar'
+    } else {
+      from = this.gnubgToPoint(parseInt(parts[0]))
+    }
+
+    // Parse to point
+    if (parts[1] === 'off') {
+      // Bearing off - calculate target based on player
+      const die = player === 'white' ?
+        (from === 'bar' ? 24 : from) - parseInt(parts[0] === 'bar' ? '25' : parts[0]) :
+        parseInt(parts[0] === 'bar' ? '0' : parts[0]) + parseInt(parts[0] === 'bar' ? '25' : parts[0])
+      to = die
+    } else {
+      to = this.gnubgToPoint(parseInt(parts[1]))
+    }
+
+    return {
+      from,
+      to,
+      notation: notation,
+      player: player
+    }
+  }
+
   // Get game state for API response
   getGameState() {
     return {
@@ -377,7 +442,10 @@ class BackgammonGame {
       board: this.board,
       dice: this.dice,
       diceUsed: this.diceUsed,
-      availableMoves: this.moves,
+      availableMoves: this.moves.map(move => ({
+        ...move,
+        gnubgNotation: this.moveToGNUBGNotation(move)
+      })),
       doublingCube: this.doublingCube,
       pipCount: {
         white: this.calculatePipCount('white'),

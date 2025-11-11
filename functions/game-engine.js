@@ -285,7 +285,7 @@ async function makeMove(event) {
   const gameId = event.path.split('/').slice(-2)[0]
   const game = activeGames.get(gameId)
   const body = JSON.parse(event.body)
-  const { from, to } = body
+  const { from, to, gnubgNotation } = body
 
   if (!game) {
     return {
@@ -299,21 +299,41 @@ async function makeMove(event) {
   }
 
   try {
-    // Find the move
-    const move = game.moves.find(m => m.from === from && m.to === to)
-    if (!move) {
+    let move
+
+    // Support both internal format and GNUBG notation
+    if (gnubgNotation) {
+      // Parse GNUBG notation
+      move = game.parseGNUBGNotation(gnubgNotation, game.currentPlayer)
+    } else {
+      // Use internal format
+      move = { from, to, player: game.currentPlayer }
+    }
+
+    // Find the move in available moves
+    const availableMove = game.moves.find(m =>
+      m.from === move.from && m.to === move.to
+    )
+
+    if (!availableMove) {
       return {
         statusCode: 400,
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
-        body: JSON.stringify({ error: 'Illegal move' })
+        body: JSON.stringify({
+          error: 'Illegal move',
+          availableMoves: game.moves.map(m => ({
+            ...m,
+            gnubgNotation: game.moveToGNUBGNotation(m)
+          }))
+        })
       }
     }
 
     // Make the move
-    const result = game.makeMove(move)
+    const result = game.makeMove(availableMove)
 
     // Update database
     await supabase
@@ -323,7 +343,8 @@ async function makeMove(event) {
         current_player: game.currentPlayer,
         status: game.status,
         winner: game.winner,
-        score: game.score,
+        score_white: game.score.white,
+        score_black: game.score.black,
         dice: game.dice,
         updated_at: new Date()
       })
@@ -344,9 +365,15 @@ async function makeMove(event) {
       body: JSON.stringify({
         success: true,
         data: {
-          move: result,
+          move: {
+            ...result,
+            gnubgNotation: game.moveToGNUBGNotation(result)
+          },
           gameState: game.getGameState(),
-          aiMove: aiMove
+          aiMove: aiMove ? {
+            ...aiMove,
+            gnubgNotation: game.moveToGNUBGNotation(aiMove)
+          } : null
         }
       })
     }
@@ -548,7 +575,27 @@ async function makeAIMove(game) {
   // Simple AI logic - can be enhanced later
   if (game.moves.length > 0) {
     const randomMove = game.moves[Math.floor(Math.random() * game.moves.length)]
-    return game.makeMove(randomMove)
+    const result = game.makeMove(randomMove)
+
+    // Update database for AI move
+    await supabase
+      .from('games')
+      .update({
+        board_state: JSON.stringify(game.board),
+        current_player: game.currentPlayer,
+        status: game.status,
+        winner: game.winner,
+        score_white: game.score.white,
+        score_black: game.score.black,
+        dice: game.dice,
+        updated_at: new Date()
+      })
+      .eq('id', game.gameId)
+
+    return {
+      ...result,
+      gnubgNotation: game.moveToGNUBGNotation(result)
+    }
   }
   return null
 }
