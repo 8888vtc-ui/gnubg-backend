@@ -143,6 +143,10 @@ model user_analytics {
   claude_quota_remaining       Int      @default(10)
   chatgpt_requests_today       Int      @default(0)
   chatgpt_requests_this_month  Int      @default(0)
+  gurubot_requests_today       Int      @default(0)
+  gurubot_requests_this_month  Int      @default(0)
+  gurubot_quota_remaining      Int      @default(20)
+  easybot_requests_today       Int      @default(0)
   createdAt                    DateTime @default(now())
   users                        users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
