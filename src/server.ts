@@ -26,6 +26,9 @@ import gamesRouter from './routes/games';
 import gnubgRouter from './routes/gnubg';
 import gnubgDebugRouter from './routes/gnubgDebug';
 
+// Import WebSocket server
+import { initWebSocketServer } from './websocket-server';
+
 // DDoS Protection middleware
 const ddosProtection = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const clientIP = req.ip || req.connection.remoteAddress;
@@ -136,6 +139,9 @@ app.get('/health', async (req: express.Request, res: express.Response) => {
     const memoryUsage = process.memoryUsage();
     const uptime = process.uptime();
 
+    // Get WebSocket stats
+    const wsStats = require('./websocket-server').getWebSocketStats();
+
     res.status(200).json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -144,6 +150,12 @@ app.get('/health', async (req: express.Request, res: express.Response) => {
         connected: true,
         users: userCount,
         games: gameCount
+      },
+      websocket: wsStats || {
+        activeConnections: 0,
+        activeGames: 0,
+        waitingPlayers: 0,
+        uptime: Math.round(uptime)
       },
       memory: {
         rss: Math.round(memoryUsage.rss / 1024 / 1024) + ' MB',
@@ -301,7 +313,6 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
   logger.error('Application Error:', {
     message: error.message,
     stack: error.stack,
-    url: req.url,
     method: req.method,
     ip: req.ip,
     userId: (req as any).user?.id || 'anonymous'
@@ -320,6 +331,10 @@ const server = app.listen(config.port, () => {
   logger.info(`📊 Monitoring: Audit Logging, Health Checks, Performance Metrics`);
   logger.info(`🚀 Optimization: Request Timeouts, HPP Protection, Error Sanitization`);
   logger.info(`🌍 Environment: ${config.nodeEnv} | Uptime: ${Math.round(process.uptime())}s`);
+
+  // Initialize WebSocket server for real-time multiplayer
+  initWebSocketServer(server);
+  logger.info(`🕸️  WebSocket Server initialized for real-time multiplayer`);
 });
 
 // Graceful shutdown with security cleanup

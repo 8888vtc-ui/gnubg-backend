@@ -31,19 +31,11 @@ declare module './language-manager' {
   export const REGION_LANGUAGE_MAP: any;
 }
 
-declare module './backgammon-coach' {
-  export class BackgammonCoach {
-    getRuleExplanation(ruleKey: string): any;
-    getLearningCurriculum(): any;
-    getTutorialScenario(index: number): any;
-    validateMoveWithFeedback(board: any, move: any, player: string, dice: number[]): any;
-    generateProgressReport(userId: string, completedLessons: string[], gamesPlayed: number, winRate: number): any;
-    getNextRecommendedLesson(completedLessons: string[]): string;
-    getUnlockedAchievements(lessons: string[], games: number, winRate: number): string[];
-    calculateLearningStreak(completedLessons: string[]): number;
-    assessSkillLevel(games: number, winRate: number): string;
+declare module './websocket-server' {
+  export function initWebSocketServer(server: any): any;
+  export function getWebSocketStats(): any;
+  export class WebSocketServer {
+    constructor(server: any);
+    getStats(): any;
   }
-  export const BACKGAMMON_RULES: any;
-  export const LEARNING_MODULES: any;
-  export const TUTORIAL_SCENARIOS: any;
 }
