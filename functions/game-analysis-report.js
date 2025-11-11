@@ -6,9 +6,9 @@ const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// GNUBG and Claude API configurations
-const GNUBG_SERVICE_URL = process.env.GNUBG_SERVICE_URL
-const GNUBG_API_KEY = process.env.GNUBG_API_KEY
+// Game Analyzer and Claude API configurations
+const GAME_ANALYZER_SERVICE_URL = process.env.GAME_ANALYZER_SERVICE_URL || process.env.GNUBG_SERVICE_URL
+const GAME_ANALYZER_API_KEY = process.env.GAME_ANALYZER_API_KEY || process.env.GNUBG_API_KEY
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages'
 
@@ -102,20 +102,20 @@ exports.handler = async (event, context) => {
 
     console.log('🎯 Starting comprehensive game analysis...')
 
-    // Step 1: Get GNUBG technical analysis
-    console.log('📊 Step 1: Calling GNUBG for technical analysis...')
-    const gnubgAnalysis = await getGNUBGAnalysis(gameMoves, playerColor)
+    // Step 1: Get Game Analyzer technical analysis
+    console.log('📊 Step 1: Calling Game Analyzer for technical analysis...')
+    const gameAnalyzerAnalysis = await getGameAnalyzerAnalysis(gameMoves, playerColor)
 
-    // Step 2: Identify key mistakes using GNUBG data
+    // Step 2: Identify key mistakes using Game Analyzer data
     console.log('🔍 Step 2: Identifying key mistakes...')
-    const keyMistakes = identifyKeyMistakes(gnubgAnalysis, gameMoves)
+    const keyMistakes = identifyKeyMistakes(gameAnalyzerAnalysis, gameMoves)
 
     // Step 3: Get Claude educational explanations
     console.log('🤖 Step 3: Getting Claude educational analysis...')
     const educationalAnalysis = await getClaudeEducationalAnalysis(
       gameMoves,
       keyMistakes,
-      gnubgAnalysis,
+      gameAnalyzerAnalysis,
       winner,
       playerColor
     )
@@ -127,7 +127,7 @@ exports.handler = async (event, context) => {
     // Step 5: Create comprehensive report
     console.log('📋 Step 5: Generating final analysis report...')
     const analysisReport = createComprehensiveReport(
-      gnubgAnalysis,
+      gameAnalyzerAnalysis,
       educationalAnalysis,
       visualMistakes,
       gameMoves,
@@ -191,14 +191,14 @@ exports.handler = async (event, context) => {
   }
 }
 
-// Get GNUBG technical analysis
-async function getGNUBGAnalysis(gameMoves, playerColor) {
+// Get Game Analyzer technical analysis
+async function getGameAnalyzerAnalysis(gameMoves, playerColor) {
   try {
-    const response = await fetch(`${GNUBG_SERVICE_URL}/api/gnubg/analyze-game`, {
+    const response = await fetch(`${GAME_ANALYZER_SERVICE_URL}/api/game-analyzer/analyze-game`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GNUBG_API_KEY}`
+        'Authorization': `Bearer ${GAME_ANALYZER_API_KEY}`
       },
       body: JSON.stringify({
         moves: gameMoves,
@@ -211,17 +211,17 @@ async function getGNUBGAnalysis(gameMoves, playerColor) {
       const data = await response.json()
       return data.analysis
     } else {
-      console.log('GNUBG analysis failed, using fallback data')
-      return generateFallbackGNUBGAnalysis(gameMoves, playerColor)
+      console.log('Game Analyzer analysis failed, using fallback data')
+      return generateFallbackGameAnalyzerAnalysis(gameMoves, playerColor)
     }
   } catch (error) {
-    console.error('GNUBG API error:', error)
-    return generateFallbackGNUBGAnalysis(gameMoves, playerColor)
+    console.error('Game Analyzer API error:', error)
+    return generateFallbackGameAnalyzerAnalysis(gameMoves, playerColor)
   }
 }
 
-// Generate fallback GNUBG analysis
-function generateFallbackGNUBGAnalysis(gameMoves, playerColor) {
+// Generate fallback Game Analyzer analysis
+function generateFallbackGameAnalyzerAnalysis(gameMoves, playerColor) {
   const totalMoves = gameMoves.length
   const playerMoves = gameMoves.filter(move => move.player === playerColor)
 
@@ -289,7 +289,7 @@ function categorizeMistake(equityLoss, playedMove, bestMove) {
 }
 
 // Get Claude educational analysis
-async function getClaudeEducationalAnalysis(gameMoves, keyMistakes, gnubgAnalysis, winner, playerColor) {
+async function getClaudeEducationalAnalysis(gameMoves, keyMistakes, gameAnalyzerAnalysis, winner, playerColor) {
   try {
     const systemPrompt = `You are Claude, an expert backgammon coach creating educational game analysis reports. Your task is to explain game mistakes in simple, easy-to-understand terms while teaching strategic concepts.
 
@@ -311,10 +311,10 @@ GAME SUMMARY:
 - Player color: ${playerColor}
 - Final score: Game completed
 
-GNUBG ANALYSIS:
-- Average equity: ${gnubgAnalysis.averageEquity?.toFixed(3) || 'N/A'}
-- Skill rating: ${gnubgAnalysis.skillRating || 'N/A'}
-- Luck factor: ${gnubgAnalysis.luckFactor?.toFixed(3) || 'N/A'}
+GAME ANALYZER ANALYSIS:
+- Average equity: ${gameAnalyzerAnalysis.averageEquity?.toFixed(3) || 'N/A'}
+- Skill rating: ${gameAnalyzerAnalysis.skillRating || 'N/A'}
+- Luck factor: ${gameAnalyzerAnalysis.luckFactor?.toFixed(3) || 'N/A'}
 
 KEY MISTAKES TO ANALYZE:
 ${keyMistakes.map((mistake, idx) => `
@@ -473,7 +473,7 @@ function parseMoveNotation(move) {
 }
 
 // Create comprehensive report
-function createComprehensiveReport(gnubgAnalysis, educationalAnalysis, visualMistakes, gameMoves, winner, finalScore, playerColor) {
+function createComprehensiveReport(gameAnalyzerAnalysis, educationalAnalysis, visualMistakes, gameMoves, winner, finalScore, playerColor) {
   return {
     reportTitle: 'Complete Backgammon Game Analysis',
     gameSummary: {
@@ -482,17 +482,17 @@ function createComprehensiveReport(gnubgAnalysis, educationalAnalysis, visualMis
       playerColor: playerColor,
       finalScore: finalScore,
       duration: estimateGameDuration(gameMoves.length),
-      gnubgRating: gnubgAnalysis.skillRating
+      gameAnalyzerRating: gameAnalyzerAnalysis.skillRating
     },
     technicalAnalysis: {
-      averageEquity: gnubgAnalysis.averageEquity,
-      luckFactor: gnubgAnalysis.luckFactor,
-      keyPositionsAnalyzed: gnubgAnalysis.keyPositions?.length || 0,
+      averageEquity: gameAnalyzerAnalysis.averageEquity,
+      luckFactor: gameAnalyzerAnalysis.luckFactor,
+      keyPositionsAnalyzed: gameAnalyzerAnalysis.keyPositions?.length || 0,
       mistakesIdentified: visualMistakes.length
     },
     educationalAnalysis: educationalAnalysis,
     visualMistakes: visualMistakes,
-    improvementPlan: generateImprovementPlan(educationalAnalysis, gnubgAnalysis),
+    improvementPlan: generateImprovementPlan(educationalAnalysis, gameAnalyzerAnalysis),
     nextSteps: [
       'Practice the recommended moves in similar positions',
       'Focus on the strategic lessons identified',
@@ -501,7 +501,7 @@ function createComprehensiveReport(gnubgAnalysis, educationalAnalysis, visualMis
       'Use the analysis tool on future games'
     ],
     reportGenerated: new Date().toISOString(),
-    aiServices: ['gnubg', 'claude']
+    aiServices: ['game-analyzer', 'claude']
   }
 }
 
@@ -513,7 +513,7 @@ function estimateGameDuration(moveCount) {
 }
 
 // Generate improvement plan
-function generateImprovementPlan(educationalAnalysis, gnubgAnalysis) {
+function generateImprovementPlan(educationalAnalysis, gameAnalyzerAnalysis) {
   const plan = {
     immediateFocus: [],
     practiceAreas: [],
