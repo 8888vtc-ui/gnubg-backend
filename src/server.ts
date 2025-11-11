@@ -6,7 +6,9 @@ import { logger } from './utils/logger';
 import { loggerMiddleware } from './middleware/loggerMiddleware';
 import { errorHandlerMiddleware } from './middleware/errorHandlerMiddleware';
 import { helmet, cors, corsOptions, generalLimiter, authLimiter, validateInput } from './middleware/securityMiddleware';
-import {
+
+// Import JS modules with require to avoid TypeScript module resolution issues
+const {
   rateLimits,
   speedLimit,
   sanitizeInput,
@@ -15,8 +17,9 @@ import {
   compressionConfig,
   requestTimeout,
   auditLog
-} from './security-middleware';
-import { cacheService, CACHE_KEYS, CACHE_TTL } from './cache-service';
+} = require('./security-middleware');
+
+const { cacheService, CACHE_KEYS, CACHE_TTL } = require('./cache-service');
 
 // Import routes
 import playersRouter from './routes/players';
@@ -27,7 +30,7 @@ import gnubgRouter from './routes/gnubg';
 import gnubgDebugRouter from './routes/gnubgDebug';
 
 // Import WebSocket server
-import { initWebSocketServer } from './websocket-server';
+const { initWebSocketServer } = require('./websocket-server');
 
 // DDoS Protection middleware
 const ddosProtection = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -309,10 +312,12 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
     })
   };
 
-  // Log full error for monitoring
+  // Log error details separately for monitoring
   logger.error('Application Error:', {
-    message: error.message,
-    stack: error.stack,
+    error: {
+      message: error.message,
+      stack: error.stack
+    },
     request: {
       method: req.method,
       url: req.url,
