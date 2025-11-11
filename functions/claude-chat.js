@@ -9,6 +9,90 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages'
 
+// OpenAI ChatGPT fallback configuration
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
+
+// AI service attempt tracking
+async function callClaudeAI(messages, systemPrompt, playerLevel) {
+  if (!CLAUDE_API_KEY) {
+    throw new Error('CLAUDE_API_UNAVAILABLE')
+  }
+
+  const claudeRequest = {
+    model: 'claude-3-sonnet-20240229',
+    max_tokens: 1000,
+    system: systemPrompt,
+    messages: messages
+  }
+
+  const response = await fetch(CLAUDE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': CLAUDE_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(claudeRequest)
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Claude API error:', response.status, errorText)
+    throw new Error(`CLAUDE_API_ERROR: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return {
+    response: data.content[0].text,
+    aiService: 'claude',
+    model: 'claude-3-sonnet-20240229'
+  }
+}
+
+async function callChatGPT(messages, systemPrompt, playerLevel) {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_UNAVAILABLE')
+  }
+
+  const gptMessages = [
+    { role: 'system', content: systemPrompt },
+    ...messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }))
+  ]
+
+  const gptRequest = {
+    model: 'gpt-4',
+    messages: gptMessages,
+    max_tokens: 1000,
+    temperature: 0.7
+  }
+
+  const response = await fetch(OPENAI_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify(gptRequest)
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('OpenAI API error:', response.status, errorText)
+    throw new Error(`OPENAI_API_ERROR: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return {
+    response: data.choices[0].message.content,
+    aiService: 'chatgpt',
+    model: 'gpt-4'
+  }
+}
+
 exports.handler = async (event, context) => {
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
@@ -118,52 +202,71 @@ Guidelines:
 
 ${gameContext ? `Current game context: ${JSON.stringify(gameContext)}` : ''}`
 
-    const claudeRequest = {
-      model: 'claude-3-sonnet-20240229',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: message
+    const messages = [
+      {
+        role: 'user',
+        content: message
+      }
+    ]
+
+    let aiResult
+    let usedFallback = false
+
+    // Try Claude first
+    try {
+      console.log('Attempting Claude AI...')
+      aiResult = await callClaudeAI(messages, systemPrompt, playerLevel)
+      console.log('Claude AI succeeded')
+    } catch (claudeError) {
+      console.log('Claude AI failed, trying ChatGPT fallback...', claudeError.message)
+
+      // Try ChatGPT as fallback
+      try {
+        aiResult = await callChatGPT(messages, systemPrompt, playerLevel)
+        usedFallback = true
+        console.log('ChatGPT fallback succeeded')
+      } catch (gptError) {
+        console.error('Both Claude and ChatGPT failed:', claudeError.message, gptError.message)
+        return {
+          statusCode: 503,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+          },
+          body: JSON.stringify({
+            error: 'AI services temporarily unavailable. Please try again later.',
+            details: 'Both Claude and ChatGPT are currently unavailable.'
+          })
         }
-      ]
+      }
     }
 
-    // Call Claude API
-    const claudeResponse = await fetch(CLAUDE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify(claudeRequest)
-    })
+    const response = aiResult.response
 
-    if (!claudeResponse.ok) {
-      throw new Error(`Claude API error: ${claudeResponse.status}`)
-    }
-
-    const claudeData = await claudeResponse.json()
-    const response = claudeData.content[0].text
-
-    // Update usage statistics
+    // Update usage statistics (track which AI service was used)
     const now = new Date()
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    const usageUpdate = {
+      claude_requests_this_month: (usageData?.claude_requests_this_month || 0) + 1,
+      claude_quota_remaining: quotaRemaining - 1
+    }
+
+    // Add AI service tracking
+    if (usedFallback) {
+      usageUpdate.chatgpt_requests_this_month = (usageData?.chatgpt_requests_this_month || 0) + 1
+    }
 
     await supabase
       .from('user_analytics')
       .upsert({
         user_id: user.id,
         date: now.toISOString().split('T')[0],
-        claude_requests_this_month: (usageData?.claude_requests_this_month || 0) + 1,
-        claude_quota_remaining: quotaRemaining - 1
+        ...usageUpdate
       }, {
         onConflict: 'user_id,date'
       })
 
-    // Return response
+    // Return response with AI service info
     return {
       statusCode: 200,
       headers: {
@@ -174,6 +277,9 @@ ${gameContext ? `Current game context: ${JSON.stringify(gameContext)}` : ''}`
         success: true,
         data: {
           response: response,
+          aiService: aiResult.aiService,
+          model: aiResult.model,
+          usedFallback: usedFallback,
           usage: {
             remaining: quotaRemaining - 1,
             total: 10 // Free tier limit

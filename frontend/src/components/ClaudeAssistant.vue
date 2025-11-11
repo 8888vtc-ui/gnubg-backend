@@ -9,12 +9,19 @@
     <div class="assistant-header">
       <div class="header-content">
         <div class="ai-avatar">
-          <div class="avatar-icon">🤖</div>
+          <div class="avatar-icon">
+            {{ currentAI === 'claude' ? '🤖' : '🧠' }}
+          </div>
           <div class="status-indicator" :class="{ online: isClaudeOnline }"></div>
         </div>
         <div class="header-info">
-          <h3>Claude - Coach Backgammon</h3>
-          <p class="status-text">{{ claudeStatus }}</p>
+          <h3>{{ currentAIName }}</h3>
+          <p class="status-text">
+            {{ claudeStatus }}
+            <span v-if="lastResponse && lastResponse.usedFallback" class="fallback-notice">
+              (ChatGPT fallback)
+            </span>
+          </p>
         </div>
       </div>
       <div class="header-actions">
@@ -301,6 +308,7 @@ export default {
     const gameContext = ref(props.initialGameContext)
     const quotaInfo = ref(null)
     const usageStats = ref({})
+    const lastResponse = ref(null) // Track last AI response
     
     // Settings
     const settings = ref({
@@ -342,6 +350,13 @@ export default {
              !isLoading.value &&
              isClaudeOnline.value &&
              (quotaInfo.value ? quotaInfo.value.remaining > 0 : true)
+    })
+    
+    // AI Service tracking
+    const currentAI = computed(() => lastResponse.value?.aiService || 'claude')
+    const currentAIName = computed(() => {
+      if (currentAI.value === 'chatgpt') return 'ChatGPT - Coach Backgammon'
+      return 'Claude - Coach Backgammon'
     })
     
     // Initialize
@@ -439,6 +454,13 @@ export default {
         
         if (data.success) {
           addMessage('assistant', data.data.response)
+          
+          // Store response information for UI updates
+          lastResponse.value = {
+            aiService: data.data.aiService,
+            model: data.data.model,
+            usedFallback: data.data.usedFallback || false
+          }
           
           // Play sound if enabled
           if (settings.value.soundEnabled) {
@@ -710,6 +732,9 @@ export default {
       gameContext,
       claudeStatus,
       canSendMessage,
+      currentAI,
+      currentAIName,
+      lastResponse,
       quickActions,
       suggestions,
       quotaInfo,
@@ -815,6 +840,12 @@ export default {
   margin: 0;
   font-size: 0.9em;
   opacity: 0.9;
+}
+
+.fallback-notice {
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 0.8em;
 }
 
 .header-actions {
