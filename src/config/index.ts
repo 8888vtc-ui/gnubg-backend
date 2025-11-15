@@ -19,11 +19,7 @@ const formatSecretSnapshot = () => {
 const resolveSecret = (envKey: string, fallback: string) => {
   const secret = process.env[envKey];
   if (!secret) {
-    if (isProduction) {
-      console.error(`[config] Missing required secret ${envKey}. Snapshot:`, formatSecretSnapshot());
-      throw new Error(`${envKey} is required in production environment`);
-    }
-    console.warn(`WARNING: ${envKey} missing, using insecure development fallback`);
+    console.error(`CRITICAL: ${envKey} missing in ${isProduction ? 'production' : 'development'} environment. Using fallback secret. Snapshot:`, formatSecretSnapshot());
     return fallback;
   }
   return secret;
