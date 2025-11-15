@@ -1,7 +1,12 @@
 // src/server.ts
 import fs from 'fs';
 import path from 'path';
-import express from 'express';
+import type {
+  Request,
+  Response,
+  NextFunction,
+  RequestHandler
+} from 'express';
 import { PrismaClient } from '@prisma/client';
 import type { Server } from 'http';
 import { config } from './config';
@@ -13,8 +18,12 @@ import { createRateLimiter } from './middleware/rateLimiter';
 import { metricsRegistry } from './metrics/registry';
 import { httpRequestDurationSeconds, httpRequestsTotal } from './metrics/httpMetrics';
 
-const routerPath = path.join(require.resolve('express/lib/application'), '..', 'router', 'index.js');
+const routerPath = path.join(path.dirname(require.resolve('express/lib/application')), 'router', 'index.js');
 console.log('[startup] express router exists:', fs.existsSync(routerPath), routerPath);
+
+const expressModule = require('express') as typeof import('express');
+const express = (expressModule as unknown as { default?: typeof expressModule }).default ??
+  (expressModule as unknown as typeof expressModule);
 
 // Import JS modules with require to avoid TypeScript module resolution issues
 const {
@@ -42,7 +51,7 @@ import { initWebSocketServer } from './websocket/server';
 import { GameSessionRegistryScheduler } from './services/gameSessionRegistry';
 
 // DDoS Protection middleware
-const ddosProtection = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+const ddosProtection = (req: Request, res: Response, next: NextFunction) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   const userAgent = req.get('User-Agent') || '';
   const suspiciousPatterns = [
@@ -65,7 +74,7 @@ const ddosProtection = (req: express.Request, res: express.Response, next: expre
   next();
 };
 
-const metricsMiddleware: express.RequestHandler = (req, res, next) => {
+const metricsMiddleware: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
   const start = process.hrtime.bigint();
 
   res.on('finish', () => {
@@ -130,7 +139,7 @@ app.use(ddosProtection);
 app.use(speedLimit);
 
 // CORS bypass for health check (Railway internal requests)
-app.use('/health', (req, res, next) => {
+app.use('/health', (req: Request, res: Response, next: NextFunction) => {
   // Skip most middleware for health endpoint
   next();
 });
@@ -200,7 +209,7 @@ app.use('/api/leaderboards', leaderboardsRouter);
 app.use('/api/gnubg', gnubgRouter);
 app.use('/api/gnubg-debug', gnubgDebugRouter);
 
-app.get('/metrics', async (_req: express.Request, res: express.Response) => {
+app.get('/metrics', async (req: Request, res: Response) => {
   try {
     const metrics = await metricsRegistry.metrics();
     res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
@@ -215,7 +224,7 @@ app.get('/metrics', async (_req: express.Request, res: express.Response) => {
 });
 
 // Enhanced health check with security metrics
-app.get('/health', async (req: express.Request, res: express.Response) => {
+app.get('/health', async (req: Request, res: Response) => {
   try {
     // Test database connectivity with a simple query
     const userCount = await prisma.users.count();
@@ -269,7 +278,7 @@ app.get('/health', async (req: express.Request, res: express.Response) => {
 });
 
 // Security status endpoint
-app.get('/api/security-status', (req: express.Request, res: express.Response) => {
+app.get('/api/security-status', (req: Request, res: Response) => {
   res.json({
     security: {
       helmet: 'enabled',
@@ -297,7 +306,7 @@ app.get('/api/security-status', (req: express.Request, res: express.Response) =>
 });
 
 // Cache status endpoint
-app.get('/api/cache-status', async (req: express.Request, res: express.Response) => {
+app.get('/api/cache-status', async (req: Request, res: Response) => {
   const cacheStats = await cacheService.stats();
 
   res.json({
@@ -312,7 +321,7 @@ app.get('/api/cache-status', async (req: express.Request, res: express.Response)
 });
 
 // Global performance monitor endpoint
-app.get('/api/performance/global', (req: express.Request, res: express.Response) => {
+app.get('/api/performance/global', (req: Request, res: Response) => {
   const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
   const userAgent = req.get('User-Agent') || '';
   const clientRegion = (req.headers['x-client-region'] as string) || 'unknown';
@@ -358,7 +367,7 @@ app.get('/api/performance/global', (req: express.Request, res: express.Response)
 });
 
 // Route racine with security info
-app.get('/', (req: express.Request, res: express.Response) => {
+app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'GammonGuru API - Enterprise Security Enabled',
     version: '1.0.0',
@@ -383,7 +392,7 @@ app.get('/', (req: express.Request, res: express.Response) => {
 });
 
 // Middleware de gestion d'erreurs (sanitized)
-app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
   // Sanitize error messages
   const sanitizedError = {
     error: 'Internal server error',
