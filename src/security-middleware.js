@@ -5,6 +5,56 @@ const compression = require('compression')
 const hpp = require('hpp')
 const helmet = require('helmet')
 const { body, param, query, validationResult } = require('express-validator')
+const { Logger } = require('./utils/logger')
+
+const auditLogger = new Logger('AuditLog')
+const nodeEnv = process.env.NODE_ENV ?? 'development'
+const isProduction = nodeEnv === 'production'
+
+const parseList = (value) => (
+  typeof value === 'string'
+    ? value.split(',').map(item => item.trim()).filter(Boolean)
+    : []
+)
+
+const appendSources = (target, sources) => {
+  for (const source of sources) {
+    if (source && !target.includes(source)) {
+      target.push(source)
+    }
+  }
+}
+
+const defaultFrontendOrigins = ['https://gammon-guru.app', 'https://app.gammonguru.com']
+const trustedFrontends = Array.from(new Set([
+  ...defaultFrontendOrigins,
+  ...parseList(process.env.FRONTEND_URL),
+  ...parseList(process.env.CORS_ORIGIN)
+]))
+
+const connectSrc = ["'self'", 'https:', 'wss:']
+const imgSrc = ["'self'", 'data:', 'https:']
+const styleSrc = ["'self'", 'https://fonts.googleapis.com']
+const fontSrc = ["'self'", 'https://fonts.gstatic.com']
+const scriptSrc = ["'self'"]
+
+if (!isProduction) {
+  appendSources(connectSrc, ['http://localhost:*', 'ws:', 'http:'])
+  appendSources(imgSrc, ['http://localhost:*'])
+  appendSources(styleSrc, ["'unsafe-inline'", 'http://localhost:*'])
+  appendSources(scriptSrc, ["'unsafe-inline'", "'unsafe-eval'"])
+} else {
+  appendSources(styleSrc, ["'unsafe-inline'"])
+}
+
+appendSources(connectSrc, trustedFrontends)
+appendSources(imgSrc, trustedFrontends)
+
+appendSources(connectSrc, parseList(process.env.CSP_CONNECT_SRC))
+appendSources(imgSrc, parseList(process.env.CSP_IMG_SRC))
+appendSources(styleSrc, parseList(process.env.CSP_STYLE_SRC))
+appendSources(fontSrc, parseList(process.env.CSP_FONT_SRC))
+appendSources(scriptSrc, parseList(process.env.CSP_SCRIPT_SRC))
 
 // Rate limiting configurations
 const createRateLimit = (windowMs, maxRequests, message) => {
@@ -61,13 +111,18 @@ const rateLimits = {
   )
 }
 
-// Slow down progressive delays
-const speedLimit = slowDown({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  delayAfter: 100, // Allow 100 requests per 15 minutes
-  delayMs: 500, // Add 500ms delay per request after limit
-  maxDelayMs: 20000 // Maximum delay of 20 seconds
-})
+// Slow down progressive delays (disabled outside production to keep tests fast)
+const speedLimit = isProduction
+  ? slowDown({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    delayAfter: 100, // Allow 100 requests per 15 minutes
+    delayMs: 500, // Add 500ms delay per request after limit
+    maxDelayMs: 20000 // Maximum delay of 20 seconds
+  })
+  : Object.assign((req, _res, next) => next(), {
+    resetKey: () => {},
+    store: undefined
+  })
 
 // Input validation middleware
 const validateRequest = (req, res, next) => {
@@ -125,11 +180,11 @@ const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:", "http://localhost:*"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "https:", "http://localhost:*", "ws:", "wss:"],
+      styleSrc,
+      fontSrc,
+      imgSrc,
+      scriptSrc,
+      connectSrc,
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: [],
@@ -141,7 +196,6 @@ const securityHeaders = helmet({
     preload: true
   },
   noSniff: true,
-  xssFilter: true,
   referrerPolicy: { policy: "strict-origin-when-cross-origin" }
 })
 
@@ -208,20 +262,26 @@ const auditLog = (req, res, next) => {
 
   res.on('finish', () => {
     const duration = Date.now() - startTime
+    const requestId = req.requestId || res.get('X-Request-Id') || undefined
     const logEntry = {
       timestamp: new Date().toISOString(),
       method: req.method,
       url: req.url,
       status: res.statusCode,
-      duration: `${duration}ms`,
+      durationMs: duration,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
       userId: req.user?.id || 'anonymous',
-      contentLength: res.get('Content-Length') || 0
+      contentLength: Number(res.get('Content-Length') || 0),
+      origin: req.get('Origin') || undefined,
+      referer: req.get('Referer') || undefined,
+      requestId
     }
 
-    // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
+    const logMethod = res.statusCode >= 400 ? auditLogger.warn.bind(auditLogger) : auditLogger.info.bind(auditLogger)
+    logMethod('HTTP request audit', logEntry)
+
+    if (!isProduction) {
       console.log('AUDIT:', JSON.stringify(logEntry))
     }
 

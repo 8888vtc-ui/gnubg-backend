@@ -11,15 +11,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import BackgammonBoard from '@/components/BackgammonBoard.vue'
+import socketClient from '@/services/socketClient'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 
 // Get game ID from route params
 const gameId = ref(route.params.id as string)
+
+const unsubscribe = ref<() => void>()
 
 // Event handlers
 const onGameCreated = (game: any) => {
@@ -36,6 +41,25 @@ const onGameLoaded = (game: any) => {
 const goBack = () => {
   router.push('/dashboard')
 }
+
+onMounted(() => {
+  const tokenSource = authStore.token as string | null
+  const tokenValue = tokenSource ?? (authStore as any).token?.value ?? null
+
+  if (!tokenValue || !gameId.value) {
+    return
+  }
+
+  socketClient.connect(gameId.value, tokenValue)
+  unsubscribe.value = socketClient.onMessage((message) => {
+    console.log('[ws] message', message)
+  })
+})
+
+onBeforeUnmount(() => {
+  unsubscribe.value?.()
+  socketClient.disconnect()
+})
 </script>
 
 <style scoped>

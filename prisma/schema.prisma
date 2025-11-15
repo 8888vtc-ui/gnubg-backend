@@ -8,79 +8,106 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model analyses {
-  id            String       @id
-  user_id       String
-  board_state   String
-  dice          Int[]
-  move          String
-  best_move     String
-  equity        Float
-  pr            Float
-  explanation   String
-  alternatives  Json         @default("[]")
-  analysis_type AnalysisType @default(FULL)
-  createdAt     DateTime     @default(now())
-  users         users        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+enum TimeControlPreset {
+  BLITZ
+  NORMAL
+  LONG
+  CUSTOM
+}
 
-  @@index([user_id, createdAt])
+model analyses {
+  id           String       @id
+  userId       String       @map("user_id")
+  boardState   String       @map("board_state")
+  dice         Int[]
+  move         String
+  bestMove     String       @map("best_move")
+  equity       Float
+  pr           Float
+  explanation  String
+  alternatives Json         @default("[]")
+  analysisType AnalysisType @default(FULL) @map("analysis_type")
+  createdAt    DateTime     @default(now())
+  user         users        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("analyses")
+}
+
+model AnalysisQuota {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  date        DateTime
+  count       Int
+  extraQuota  Int      @default(0) @map("extra_quota")
+  initialFree Boolean  @default(true) @map("initial_free")
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date], name: "userId_date")
+  @@map("analysis_quotas")
+}
+
+model IAQuota {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  dailyQuota   Int      @default(10) @map("daily_quota")
+  premiumQuota Int      @default(0) @map("premium_quota")
+  extrasUsed   Int      @default(0) @map("extras_used")
+  resetAt      DateTime @map("reset_at")
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ia_quotas")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  tokenHash  String   @map("token_hash")
+  jti        String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jti])
+  @@index([userId])
+  @@map("user_sessions")
 }
 
 model chat_messages {
-  id           String      @id
-  game_id      String
-  user_id      String?
-  message      String
-  message_type MessageType @default(TEXT)
-  createdAt    DateTime    @default(now())
-  games        games       @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  users        users?      @relation(fields: [user_id], references: [id])
+  id          String      @id
+  gameId      String      @map("game_id")
+  userId      String?     @map("user_id")
+  message     String
+  messageType MessageType @default(TEXT) @map("message_type")
+  createdAt   DateTime    @default(now())
+  game        games       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user        users?      @relation(fields: [userId], references: [id])
+
+  @@map("chat_messages")
 }
 
 model game_moves {
-  id            String   @id
-  game_id       String
-  user_id       String?
-  player        Player
-  dice          Int[]
-  move          String
-  from_point    Int?
-  to_point      Int?
-  equity        Float?
-  pr            Float?
-  thinking_time Int?
-  createdAt     DateTime @default(now())
-  games         games    @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  users         users?   @relation(fields: [user_id], references: [id])
+  id           String @id
+  gameId       String @map("game_id")
+  userId       String? @map("user_id")
+  player       Player
+  dice         Int[]
+  move         String
+  fromPoint    Int?   @map("from_point")
+  toPoint      Int?   @map("to_point")
+  equity       Float?
+  pr           Float?
+  thinkingTime Int?   @map("thinking_time")
+  createdAt    DateTime @default(now())
+  game         games    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user         users?   @relation(fields: [userId], references: [id])
 
-  @@index([game_id, createdAt])
-}
-
-model games {
-  id                                 String                  @id
-  white_player_id                    String?
-  black_player_id                    String?
-  status                             GameStatus              @default(WAITING)
-  board_state                        String                  @default("4HPwATDgc/ABMA")
-  gameMode                           GameMode                @default(AI_VS_PLAYER)
-  current_player                     Player                  @default(WHITE)
-  dice                               Int[]                   @default([])
-  white_score                        Int                     @default(0)
-  black_score                        Int                     @default(0)
-  createdAt                          DateTime                @default(now())
-  finished_at                        DateTime?
-  winner                             Player?
-  tournament_id                      String?
-  chat_messages                      chat_messages[]
-  game_moves                         game_moves[]
-  users_games_black_player_idTousers users?                  @relation("games_black_player_idTousers", fields: [black_player_id], references: [id])
-  tournaments                        tournaments?            @relation(fields: [tournament_id], references: [id])
-  users_games_white_player_idTousers users?                  @relation("games_white_player_idTousers", fields: [white_player_id], references: [id])
-  websocket_connections              websocket_connections[]
-
-  @@index([black_player_id])
-  @@index([status, createdAt])
-  @@index([white_player_id])
+  @@index([gameId, createdAt])
+  @@map("game_moves")
 }
 
 model subscriptions {
@@ -107,25 +134,58 @@ model tournament_participants {
   eliminated_at    DateTime?
   tournaments      tournaments @relation(fields: [tournament_id], references: [id], onDelete: Cascade)
   users            users       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  whiteMatches     tournament_matches[] @relation("tournament_match_white")
+  blackMatches     tournament_matches[] @relation("tournament_match_black")
+  wonMatches       tournament_matches[] @relation("tournament_match_winner")
 
   @@unique([tournament_id, user_id])
 }
 
+model tournament_matches {
+  id                  String                  @id @default(uuid())
+  tournamentId        String                  @map("tournament_id")
+  round               Int
+  matchNumber         Int                     @map("match_number")
+  whiteParticipantId  String?                 @map("white_participant_id")
+  blackParticipantId  String?                 @map("black_participant_id")
+  winnerParticipantId String?                 @map("winner_participant_id")
+  status              TournamentMatchStatus   @default(SCHEDULED)
+  scheduledAt         DateTime?               @map("scheduled_at")
+  startedAt           DateTime?               @map("started_at")
+  finishedAt          DateTime?               @map("finished_at")
+  gameId              String?                 @unique @map("game_id")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+
+  tournament tournaments              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  white      tournament_participants? @relation("tournament_match_white", fields: [whiteParticipantId], references: [id])
+  black      tournament_participants? @relation("tournament_match_black", fields: [blackParticipantId], references: [id])
+  winner     tournament_participants? @relation("tournament_match_winner", fields: [winnerParticipantId], references: [id])
+  game       games?                   @relation("tournament_match_game", fields: [gameId], references: [id], onDelete: SetNull)
+
+  @@index([tournamentId, round])
+  @@index([gameId])
+  @@map("tournament_matches")
+}
+
 model tournaments {
-  id                      String                    @id
-  name                    String
-  description             String?
-  entryFee                Int                       @default(0)
-  prizePool               Int                       @default(0)
-  maxPlayers              Int?
-  status                  TournamentStatus          @default(REGISTRATION)
-  start_time              DateTime?
-  end_time                DateTime?
-  created_by              String
-  createdAt               DateTime                  @default(now())
-  games                   games[]
-  tournament_participants tournament_participants[]
-  users                   users                     @relation(fields: [created_by], references: [id])
+  id          String             @id
+  name        String
+  description String?
+  entryFee    Int                @default(0)
+  prizePool   Int                @default(0)
+  maxPlayers  Int?
+  status      TournamentStatus   @default(REGISTRATION)
+  startTime   DateTime?          @map("start_time")
+  endTime     DateTime?          @map("end_time")
+  createdBy   String             @map("created_by")
+  createdAt   DateTime           @default(now())
+  games       games[]
+  participants tournament_participants[]
+  matches      tournament_matches[]
+  creator     users              @relation(fields: [createdBy], references: [id])
+
+  @@map("tournaments")
 }
 
 model user_analytics {
@@ -166,25 +226,100 @@ model game_analyses {
 }
 
 model games {
-  id              String   @id
-  white_player_id String
-  black_player_id String?
-  game_mode       String   @default("AI_VS_PLAYER")
-  status          String   @default("WAITING") // WAITING, PLAYING, COMPLETED
-  winner          String?
-  score_white     Int      @default(0)
-  score_black     Int      @default(0)
-  board_state     Json     @default("{}")
-  current_player  String   @default("white")
-  dice            Json     @default("[]")
-  doubling_cube   Json     @default("{\"value\":1,\"owner\":null,\"centered\":true}")
-  match_length    Int      @default(1)
-  crawford_rule   Boolean  @default(true)
-  jacoby_rule     Boolean  @default(false)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id            String     @id
+  whitePlayerId String     @map("white_player_id")
+  blackPlayerId String?    @map("black_player_id")
+  tournamentId  String?    @map("tournament_id")
+  gameMode      GameMode   @default(AI_VS_PLAYER) @map("game_mode")
+  status        GameStatus @default(WAITING)
+  stake         Int        @default(0)
+  winner        Player?
+  drawOfferedBy Player?    @map("draw_offered_by")
+  whiteScore    Int        @default(0) @map("white_score")
+  blackScore    Int        @default(0) @map("black_score")
+  boardState    Json       @default("{}") @map("board_state")
+  currentPlayer Player     @default(WHITE) @map("current_player")
+  dice          Int[]      @default([])
+  cubeLevel     Int        @default(1) @map("cube_level")
+  cubeOwner     Player?    @map("cube_owner")
+  matchLength   Int?       @map("match_length")
+  doubleOfferedBy String?  @map("double_offered_by")
+  doublePending  Boolean   @default(false) @map("double_pending")
+  cubeHistory    Json       @default("[]") @map("cube_history")
+  timeControlPreset TimeControlPreset? @map("time_control_preset")
+  timeControlTotalMs Int? @map("time_control_total_ms")
+  timeControlIncrementMs Int? @map("time_control_increment_ms")
+  timeControlDelayMs Int? @map("time_control_delay_ms")
+  whiteTimeRemainingMs Int? @map("white_time_remaining_ms")
+  blackTimeRemainingMs Int? @map("black_time_remaining_ms")
+  activeTimer   Player?    @map("active_timer")
+  timerUpdatedAt DateTime? @map("timer_updated_at")
+  createdAt     DateTime   @default(now())
+  finishedAt    DateTime?  @map("finished_at")
+  updatedAt     DateTime   @updatedAt
+  resignationType ResignationType? @map("resignation_type")
+
+  chatMessages         chat_messages[]
+  gameMoves            game_moves[]
+  tournament           tournaments?            @relation(fields: [tournamentId], references: [id])
+  websocketConnections websocket_connections[]
+  whitePlayer          users                   @relation("white_games", fields: [whitePlayerId], references: [id])
+  blackPlayer          users?                  @relation("black_games", fields: [blackPlayerId], references: [id])
+  match                matches?
+  tournamentMatch      tournament_matches?     @relation("tournament_match_game")
+  sessions             GameSession[]
+  events               GameEvent[]
 
   @@map("games")
+}
+
+model GameSession {
+  id               String   @id @default(uuid())
+  gameId           String   @map("game_id")
+  userId           String   @map("user_id")
+  resumeTokenHash  String   @map("resume_token_hash")
+  lastAckSequence  Int      @default(0) @map("last_ack_sequence")
+  lastHeartbeatAt  DateTime? @map("last_heartbeat_at")
+  issuedAt         DateTime @default(now()) @map("issued_at")
+  expiresAt        DateTime? @map("expires_at")
+  metadata         Json?    @map("metadata")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  game games @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, userId], map: "game_sessions_game_user_key")
+  @@map("game_sessions")
+}
+
+model GameEvent {
+  id        String   @id @default(uuid())
+  gameId    String   @map("game_id")
+  sequence  Int      @map("sequence")
+  type      String   @map("type")
+  payload   Json     @map("payload")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  game games @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, sequence], map: "game_events_game_sequence_key")
+  @@map("game_events")
+}
+
+model matches {
+  id        String      @id @default(uuid())
+  gameId    String      @unique @map("game_id")
+  length    Int
+  rules     Json        @default("{}")
+  state     MatchState  @default(IN_PROGRESS)
+  crawfordUsed Boolean  @default(false) @map("crawford_used")
+  cubeHistory  Json     @default("[]") @map("cube_history")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  game games @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@map("matches")
 }
 
 model user_learning_progress {
@@ -228,47 +363,120 @@ model user_preferences {
 }
 
 model users {
-  id                                 String                    @id
-  email                              String                    @unique
-  password                           String
-  username                           String?                   @unique
-  first_name                         String?
-  last_name                          String?
-  avatar_url                         String?
-  elo_rating                         Int                       @default(1500)
-  games_played                       Int                       @default(0)
-  games_won                          Int                       @default(0)
-  win_rate                           Float                     @default(0)
-  current_streak                     Int                       @default(0)
-  best_streak                        Int                       @default(0)
-  subscription_type                  subscription_type         @default(FREE)
-  subscription_expires_at            DateTime?
-  created_at                         DateTime                  @default(now())
-  updated_at                         DateTime                  @updatedAt
-  user_analytics                     user_analytics[]
-  game_analyses                      game_analyses[]
-  game_histories                     game_histories[]
-  games_games_black_player_idTousers games[]                   @relation("games_black_player_idTousers")
-  games_games_white_player_idTousers games[]                   @relation("games_white_player_idTousers")
-  subscriptions                      subscriptions?
-  tournament_participants            tournament_participants[]
-  tournaments                        tournaments[]
-  websocket_connections              websocket_connections[]
+  id                    String   @id
+  email                 String   @unique
+  password              String
+  username              String?  @unique
+  firstName             String?  @map("first_name")
+  lastName              String?  @map("last_name")
+  avatarUrl             String?  @map("avatar_url")
+  country               String?  @map("country")
+  eloRating             Int      @default(1500) @map("elo_rating")
+  gamesPlayed           Int      @default(0) @map("games_played")
+  gamesWon              Int      @default(0) @map("games_won")
+  winRate               Float    @default(0) @map("win_rate")
+  currentStreak         Int      @default(0) @map("current_streak")
+  bestStreak            Int      @default(0) @map("best_streak")
+  subscriptionType      SubscriptionType @default(FREE) @map("subscription_type")
+  subscriptionExpiresAt DateTime? @map("subscription_expires_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  analyses              analyses[]
+  analysisQuotas        AnalysisQuota[]
+  iaQuota               IAQuota?
+  sessions              UserSession[]
+  chatMessages          chat_messages[]
+  gameMoves             game_moves[]
+  userAnalytics         user_analytics[]
+  gameAnalyses          game_analyses[]
+  subscription          subscriptions?
+  tournamentParticipants tournament_participants[]
+  tournaments           tournaments[]
+  websocketConnections  websocket_connections[]
+  whiteGames            games[] @relation("white_games")
+  blackGames            games[] @relation("black_games")
+  gameSessions          GameSession[]
+  seasonStats           user_season_stats[]
+  seasonLeaderboards    season_leaderboard[]
+  quotaHistory          user_quota_history[]
+
+  @@map("users")
+}
+
+model seasons {
+  id          String   @id @default(uuid())
+  name        String
+  startDate   DateTime @map("start_date")
+  endDate     DateTime? @map("end_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  seasonStats user_season_stats[]
+  leaderboards season_leaderboard[]
+  quotaHistory user_quota_history[]
+
+  @@map("seasons")
+}
+
+model user_season_stats {
+  id          String  @id @default(uuid())
+  userId      String  @map("user_id")
+  seasonId    String  @map("season_id")
+  elo         Int
+  winrate     Float
+  gamesPlayed Int     @map("games_played")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user   users   @relation(fields: [userId], references: [id])
+  season seasons @relation(fields: [seasonId], references: [id])
+
+  @@unique([userId, seasonId])
+  @@map("user_season_stats")
+}
+
+model season_leaderboard {
+  id          String @id @default(uuid())
+  seasonId    String @map("season_id")
+  userId      String @map("user_id")
+  rankGlobal  Int    @map("rank_global")
+  rankCountry Int    @map("rank_country")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user   users   @relation(fields: [userId], references: [id])
+  season seasons @relation(fields: [seasonId], references: [id])
+
+  @@unique([seasonId, userId])
+  @@map("season_leaderboard")
+}
+
+model user_quota_history {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  seasonId  String   @map("season_id")
+  quotaUsed Int      @map("quota_used")
+  timestamp DateTime @default(now())
+
+  user   users   @relation(fields: [userId], references: [id])
+  season seasons @relation(fields: [seasonId], references: [id])
+
+  @@map("user_quota_history")
 }
 
 model websocket_connections {
-  id            String   @id
-  connection_id String   @unique
-  user_id       String
-  game_id       String?
-  connected_at  DateTime @default(now())
-  last_ping     DateTime @default(now())
-  is_active     Boolean  @default(true)
-  games         games?   @relation(fields: [game_id], references: [id])
-  users         users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id           String   @id
+  connectionId String   @unique @map("connection_id")
+  userId       String   @map("user_id")
+  gameId       String?  @map("game_id")
+  connectedAt  DateTime @default(now()) @map("connected_at")
+  lastPing     DateTime @default(now()) @map("last_ping")
+  isActive     Boolean  @default(true) @map("is_active")
+  game         games?   @relation(fields: [gameId], references: [id])
+  user         users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([game_id])
-  @@index([user_id])
+  @@index([gameId])
+  @@index([userId])
+  @@map("websocket_connections")
 }
 
 enum AnalysisType {
@@ -286,6 +494,8 @@ enum GameMode {
 enum GameStatus {
   WAITING
   PLAYING
+  DRAW_PENDING
+  COMPLETED
   FINISHED
   ABORTED
 }
@@ -307,6 +517,12 @@ enum MessageType {
 enum Player {
   WHITE
   BLACK
+}
+
+enum ResignationType {
+  SINGLE
+  GAMMON
+  BACKGAMMON
 }
 
 enum SubscriptionPlan {
@@ -333,4 +549,16 @@ enum TournamentStatus {
   IN_PROGRESS
   FINISHED
   CANCELLED
+}
+
+enum TournamentMatchStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MatchState {
+  IN_PROGRESS
+  FINISHED
 }

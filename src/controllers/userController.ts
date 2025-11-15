@@ -20,9 +20,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         id: true,
         username: true,
         email: true,
-        elo: true,
-        createdAt: true,
-        lastLoginAt: true
+        createdAt: true
         // Ne pas inclure le mot de passe
       }
     });
@@ -65,9 +63,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         id: true,
         username: true,
         email: true,
-        elo: true,
-        createdAt: true,
-        lastLoginAt: true
+        createdAt: true
       }
     });
 

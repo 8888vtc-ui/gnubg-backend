@@ -1,454 +1,586 @@
-# 🎲 GammonGuru Backend API Documentation
-
-**Base URL:** `https://gammon-guru-api.onrender.com`
-
-**Status:** ✅ Deployed on Render Free Tier
-
+---
+title: GammonGuru API
+base_url: https://gammon-guru-api.onrender.com
+version: 2025-11
 ---
 
-## 🔐 Authentication Endpoints
+# 🎲 GammonGuru REST API
 
-### POST `/api/auth/register`
-Register a new user account.
+Toutes les routes nécessitent un jeton JWT via `Authorization: Bearer <token>` sauf mention contraire.
 
-**Request Body:**
+## Types de réponse
+
 ```json
-{
-  "name": "username",
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-```
-
-**Response:**
-```json
+// Succès
 {
   "success": true,
-  "data": {
-    "token": "jwt-token-here",
-    "user": {
-      "id": "user-id",
-      "name": "username",
-      "email": "user@example.com"
-    }
+  "data": { /* payload */ }
+}
+
+// Erreur
+{
+  "success": false,
+  "error": "message explicite"
+}
+
+// TournamentOverview
+{
+  "tournament": {/* TournamentSummary */},
+  "role": "PLAYER",
+  "standings": [/* TournamentStanding[] */],
+  "bracket": [/* BracketRound[] */],
+  "meta": {
+    "currentRound": 1,
+    "nextRound": 2,
+    "totalRounds": 3
   }
 }
 ```
 
-### POST `/api/auth/login`
-Authenticate and get JWT token.
+## Structures utilisées
 
-**Request Body:**
 ```json
+// GameState (extrait)
 {
-  "email": "user@example.com",
-  "password": "securepassword"
+  "id": "uuid",
+  "status": "playing",
+  "gameType": "match",
+  "stake": 0,
+  "whiteScore": 0,
+  "blackScore": 0,
+  "currentPlayer": "white",
+  "board": {
+    "positions": [2,0,0,0,0,-5, ...],
+    "whiteBar": 0,
+    "blackBar": 0,
+    "whiteOff": 0,
+    "blackOff": 0
+  },
+  "dice": {
+    "dice": [3,1],
+    "remaining": [3,1],
+    "doubles": false,
+    "used": []
+  },
+  "availableMoves": [],
+  "createdAt": "2025-11-11T15:00:00.000Z",
+  "startedAt": null,
+  "finishedAt": null,
+  "player1": {
+    "id": "uuid",
+    "name": "Alice"
+  },
+  "player2": null,
+  "winner": null,
+  "drawOfferBy": null
 }
-```
 
-**Response:**
-```json
+// SuggestedMove
 {
-  "success": true,
-  "data": {
-    "token": "jwt-token-here",
-    "user": {
-      "id": "user-id",
-      "name": "username",
-      "email": "user@example.com"
-    }
-  }
+  "move": {
+    "from": 0,
+    "to": 6,
+    "player": "white",
+    "diceUsed": 6
+  },
+  "explanation": "Stubbed AI suggests advancing the highest pip.",
+  "equity": 0.4
 }
-```
 
-### POST `/api/auth/logout`
-Logout user (client-side token removal).
-
-**Headers:** `Authorization: Bearer <jwt-token>`
-
-**Response:**
-```json
+// EvaluationResult
 {
-  "success": true,
-  "message": "Logged out successfully"
-}
-```
-
----
-
-## 👤 User Management Endpoints
-
-### GET `/api/user/profile`
-Get authenticated user's profile.
-
-**Headers:** `Authorization: Bearer <jwt-token>`
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "user-id",
-    "username": "username",
-    "email": "user@example.com",
-    "elo": 1500,
-    "level": "BEGINNER"
-  }
-}
-```
-
-### PUT `/api/user/profile`
-Update user profile.
-
-**Headers:** `Authorization: Bearer <jwt-token>`
-
-**Request Body:**
-```json
-{
-  "username": "new-username",
-  "email": "new-email@example.com"
+  "equity": 0.5,
+  "pr": 8.3,
+  "winrate": 0.63,
+  "explanation": "Based on pip balance and bear-off race."
 }
 ```
 
 ---
 
-## 🎮 Game Management Endpoints
+## 🎮 Routes Jeu `/api/games`
 
 ### POST `/api/games`
-Create a new backgammon game.
+Crée une nouvelle partie. Par défaut, l’utilisateur devient joueur blanc.
 
-**Headers:** `Authorization: Bearer <jwt-token>`
+**Body**
 
-**Request Body:**
 ```json
 {
-  "gameMode": "AI_VS_PLAYER",
-  "difficulty": "MEDIUM"
+  "game_mode": "AI_VS_PLAYER", // optionnel, valeurs: AI_VS_PLAYER | PLAYER_VS_PLAYER | TOURNAMENT
+  "stake": 0,                   // optionnel, entier >= 0
+  "opponentId": "uuid"         // optionnel, pour assigner un adversaire direct
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "game": {
-      "id": "game-id",
-      "whitePlayer": {
-        "id": "user-id",
-        "username": "player-name",
-        "elo": 1500
-      },
-      "status": "WAITING",
-      "gameMode": "AI_VS_PLAYER",
-      "boardState": "4HPwATDgc/ABMA",
-      "currentPlayer": "WHITE",
-      "createdAt": "2025-11-10T22:00:00.000Z"
-    }
-  }
-}
-```
+**Réponse 201**
 
-### GET `/api/games/:gameId`
-Get detailed game information.
-
-**Headers:** `Authorization: Bearer <jwt-token>`
-
-**Response:**
 ```json
 {
   "success": true,
   "data": {
-    "game": {
-      "id": "game-id",
-      "whitePlayer": { "id": "user-id", "username": "player", "elo": 1500 },
-      "blackPlayer": null,
-      "status": "WAITING",
-      "gameMode": "AI_VS_PLAYER",
-      "boardState": "4HPwATDgc/ABMA",
-      "currentPlayer": "WHITE",
-      "dice": [],
-      "whiteScore": 0,
-      "blackScore": 0,
-      "createdAt": "2025-11-10T22:00:00.000Z"
-    },
-    "moves": []
+    "game": {/* GameState */}
   }
 }
 ```
 
-### POST `/api/games/:gameId/roll`
-Roll dice for current player.
+**Erreurs**
+- 400 : game_mode invalide ou stake négatif
+- 401 : utilisateur non authentifié
+- 500 : création impossible
 
-**Headers:** `Authorization: Bearer <jwt-token>`
+### GET `/api/games/:id/status`
+Retourne l’état courant d’une partie.
 
-**Response:**
+**Réponse 200**
+
 ```json
 {
   "success": true,
   "data": {
-    "dice": [4, 2]
+    "game": {/* GameState */}
   }
 }
 ```
 
-### POST `/api/games/:gameId/move`
-Make a move in the game.
+**Erreurs**
+- 401 : non authentifié
+- 403 : l’utilisateur ne participe pas à la partie
+- 404 : partie inexistante
 
-**Headers:** `Authorization: Bearer <jwt-token>`
+### POST `/api/games/:id/join`
+Permet à un utilisateur de rejoindre une partie en attente.
 
-**Request Body:**
-```json
-{
-  "from": 1,
-  "to": 5
-}
-```
+**Réponse 200** : payload identique à `GET /status`.
 
-**Response:**
+**Erreurs**
+- 400 : partie déjà complète ou utilisateur = créateur
+- 403 : accès interdit
+- 404 : partie introuvable
+
+### POST `/api/games/:id/roll`
+Lance les dés pour le joueur dont c’est le tour.
+
+**Réponse 200**
+
 ```json
 {
   "success": true,
   "data": {
-    "message": "Move recorded",
-    "from": 1,
-    "to": 5
+    "game": {/* GameState mis à jour */}
   }
 }
 ```
+
+**Erreurs**
+- 400 : dés déjà lancés ou partie inactives
+- 403 : mauvais joueur
+- 404 : partie introuvable
+
+### POST `/api/games/:id/move`
+Enregistre un mouvement valide.
+
+**Body**
+
+```json
+{
+  "from": 12,
+  "to": 16,
+  "diceUsed": 4
+}
+```
+
+**Réponse 200** : GameState mis à jour.
+
+**Erreurs**
+- 400 : mouvement invalide ou dés non lancés
+- 403 : mauvais joueur
+- 404 : partie introuvable
+
+### POST `/api/games/:id/resign`
+Le joueur courant abandonne. La partie est finalisée et le score mis à jour.
+
+**Réponse 200** : GameState final.
+
+**Erreurs**
+- 400 : partie déjà terminée
+- 403 : l’utilisateur n’est pas joueur
+
+### POST `/api/games/:id/draw`
+Propose (ou confirme) une nulle. Actuellement la logique valide immédiatement la nulle.
+
+**Réponse 200** : GameState avec `status = "completed"`, `winner = null`.
+
+**Erreurs**
+- 400 : partie non active
+- 403 : l’utilisateur n’est pas joueur
 
 ---
 
-## 🧠 AI Features Endpoints
+## 🧠 Routes IA `/api/games/:id`
 
-### GET `/api/ai/:gameId/suggestion`
-Get AI move suggestion for the current position.
+Les routes ci-dessous seront activées une fois la couche IA branchée au contrôleur.
 
-**Headers:** `Authorization: Bearer <jwt-token>`
+### POST `/api/games/:id/suggestions`
+Retourne un coup recommandé par l’IA GNUBG.
 
-**Response:**
+**Body (optionnel)**
+
+```json
+{
+  "maxAlternatives": 3
+}
+```
+
+**Réponse 200**
+
 ```json
 {
   "success": true,
   "data": {
     "suggestion": {
-      "from": 1,
-      "to": 5,
-      "reasoning": "Random legal move",
-      "confidence": 0.5
-    }
+      "move": {/* SuggestedMove */},
+      "explanation": "string",
+      "equity": 0.42
+    },
+    "alternatives": [
+      {/* SuggestedMove */}
+    ]
   }
 }
 ```
 
-### POST `/api/ai/:gameId/move`
-Make an AI move in the game.
+**Erreurs**
+- 400 : position invalide / pas de suggestions
+- 403 : l’utilisateur n’est pas joueur
+- 404 : partie introuvable
+- 503 : moteur IA indisponible
 
-**Headers:** `Authorization: Bearer <jwt-token>`
+### POST `/api/games/:id/evaluate`
+Analyse la position courante et fournit une évaluation détaillée.
 
-**Request Body:**
-```json
-{
-  "difficulty": "MEDIUM"
-}
-```
+**Réponse 200**
 
-**Response:**
 ```json
 {
   "success": true,
   "data": {
-    "move": {
-      "from": 12,
-      "to": 16,
-      "player": "BLACK"
-    },
-    "reasoning": "Random legal move",
-    "confidence": 0.5,
-    "difficulty": "MEDIUM"
+    "evaluation": {
+      "equity": 0.5,
+      "pr": 8.3,
+      "winrate": 0.63,
+      "explanation": "string"
+    }
   }
 }
 ```
 
-### GET `/api/ai/:gameId/analysis`
-Get AI analysis of the current position.
+**Erreurs**
+- 400 : position invalide
+- 403 : l’utilisateur n’est pas joueur
+- 404 : partie introuvable
+- 503 : moteur IA indisponible
 
-**Headers:** `Authorization: Bearer <jwt-token>`
+---
 
-**Response:**
+## Codes d’erreur standards
+
+| Code | Signification |
+| --- | --- |
+| 400 | Requête invalide (validation) |
+| 401 | Authentification requise |
+| 403 | Accès interdit |
+| 404 | Ressource introuvable |
+| 409 | Conflit (ex. partie déjà complète) |
+| 422 | Mouvement non autorisé |
+| 500 | Erreur serveur |
+
+---
+
+## 📈 Leaderboards & ELO
+
+- `GET /api/leaderboards/global?sort=elo|winrate|games&page=&perPage=` retourne `data[] + meta` (classement global).
+- `GET /api/leaderboards/country/:countryCode` filtre par code ISO 3166-1 alpha-2 normalisé.
+- `GET /api/leaderboards/season/:seasonId` combine `user_season_stats` et `season_leaderboard`.
+- Chaque entrée contient (quand disponibles) `rankGlobal`, `rankCountry`, `gamesWon`.
+- WebSocket temps réel : `wss://…/ws/leaderboard/{channel}` diffuse `LEADERBOARD_UPDATE`.
+  - Channels supportés :
+    - `global:{sort}` (`elo|winrate|games`)
+    - `country:{ISO2}:{sort}`
+    - `season:{seasonId}:{sort}`
+  - Exemple :
+
+```json
+{
+  "type": "LEADERBOARD_UPDATE",
+  "payload": {
+    "scope": {
+      "type": "global",
+      "sort": "elo"
+    },
+    "entries": [
+      {
+        "id": "user-1",
+        "username": "Alice",
+        "country": "FR",
+        "elo": 1650,
+        "winrate": 0.62,
+        "gamesPlayed": 40,
+        "gamesWon": 25,
+        "rankGlobal": 1,
+        "rankCountry": null
+      }
+    ],
+    "total": 1,
+    "timestamp": "2025-11-20T21:45:00.000Z"
+  },
+  "timestamp": "2025-11-20T21:45:00.000Z",
+  "senderId": null
+}
+```
+
+---
+
+## 🏆 Tournois `/api/tournaments`
+
+Toutes les routes sont protégées via JWT.
+
+### POST `/api/tournaments`
+Crée un tournoi. Réservé aux administrateurs (ID listés dans `TOURNAMENT_ADMIN_IDS`).
+
+**Body**
+
+```json
+{
+  "name": "Winter Cup",
+  "description": "optionnel",
+  "entryFee": 50,
+  "prizePool": 500,
+  "maxPlayers": 32,
+  "startTime": "2025-11-20T18:00:00.000Z"
+}
+```
+
+**Réponse 201** — `TournamentSummary`
+
 ```json
 {
   "success": true,
   "data": {
-    "analysis": {
-      "positionStrength": "neutral",
-      "recommendedMoves": [],
-      "winProbability": {
-        "white": 45,
-        "black": 55
-      },
-      "advice": "Focus on getting your pieces into your home board"
-    },
-    "gameState": {
-      "currentPlayer": "WHITE",
-      "dice": [4, 2],
-      "status": "PLAYING"
-    }
+    "id": "t-1",
+    "name": "Winter Cup",
+    "description": null,
+    "entryFee": 0,
+    "prizePool": 0,
+    "maxPlayers": 32,
+    "status": "REGISTRATION",
+    "startTime": null,
+    "endTime": null,
+    "createdBy": "admin-user",
+    "participants": 0,
+    "matches": 0
   }
 }
 ```
 
----
+### POST `/api/tournaments/:id/join`
+Inscrit l’utilisateur courant. Retourne `201` + participant créé. Broadcast `playerJoined`.
 
-## 👥 Public Endpoints
+### POST `/api/tournaments/:id/leave`
+Retire l’utilisateur courant (uniquement en phase `REGISTRATION`). Broadcast `tournamentUpdated` (`participantLeft`).
 
-### GET `/api/players`
-Get list of all players (public info only).
+### GET `/api/tournaments/:id`
+Retourne le `TournamentSummary`.
 
-**Response:**
+### GET `/api/tournaments/:id/participants`
+Liste des participants (`tournament_participants`).
+
+### GET `/api/tournaments/:id/leaderboard`
+Participants triés par `current_position` puis `registered_at`.
+
+### GET `/api/tournaments/:id/standings`
+Classement calculé (victoires/défaites, drapeau `eliminated`).
+
+### GET `/api/tournaments/:id/bracket`
+Liste des rounds + matches (`BracketRound[]`).
+
+### GET `/api/tournaments/:id/overview`
+Vue consolidée (résumé tournoi, rôle utilisateur, standings, bracket, meta).
+
+### POST `/api/tournaments/:id/start`
+Transition en `IN_PROGRESS`, génère les matches du round 1, broadcast `tournamentUpdated` (`started`). Autorisé pour `createdBy` ou admin.
+
+### POST `/api/tournaments/:id/matches/:matchId/report`
+Déclare le vainqueur d’un match. Payload :
+
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": "user-id",
-      "username": "player1",
-      "elo": 1500,
-      "level": "BEGINNER"
+  "winnerParticipantId": "tp-1",
+  "gameId": "g-1"
+}
+```
+
+Broadcast `matchFinished`, potentiellement `tournamentEnded`, sinon `matchCreated` pour le round suivant.
+
+### Objets utilisés
+
+```json
+// TournamentSummary
+{
+  "id": "t-1",
+  "name": "Winter Cup",
+  "description": "string|null",
+  "entryFee": 0,
+  "prizePool": 0,
+  "maxPlayers": 32,
+  "status": "REGISTRATION",
+  "startTime": "2025-11-20T18:00:00.000Z",
+  "endTime": null,
+  "createdBy": "admin-user",
+  "participants": 16,
+  "matches": 8
+}
+
+// TournamentParticipant (prisma)
+{
+  "id": "tp-1",
+  "tournament_id": "t-1",
+  "user_id": "player-1",
+  "registered_at": "2025-11-18T12:00:00.000Z",
+  "current_position": 1,
+  "eliminated_at": null
+}
+
+// TournamentMatch
+{
+  "id": "match-1",
+  "tournament_id": "t-1",
+  "round": 1,
+  "match_number": 1,
+  "white_participant_id": "tp-1",
+  "black_participant_id": "tp-2",
+  "winner_participant_id": null,
+  "status": "SCHEDULED",
+  "scheduled_at": "2025-11-20T19:00:00.000Z",
+  "started_at": null,
+  "finished_at": null,
+  "game_id": null
+}
+```
+
+---
+
+## 📡 WebSocket Tournoi `/ws/tournament`
+
+Connexion : `wss://…/ws/tournament?tournamentId={id}`
+Auth : JWT (`Authorization` ou `Sec-WebSocket-Protocol`).
+
+### Événements émis
+
+```json
+// playerJoined
+{
+  "type": "playerJoined",
+  "payload": {
+    "tournamentId": "t-1",
+    "userId": "player-1"
+  },
+  "timestamp": "2025-11-18T12:00:00.000Z"
+}
+
+// matchCreated
+{
+  "type": "matchCreated",
+  "payload": {
+    "tournamentId": "t-1",
+    "matchId": "match-2",
+    "round": 2,
+    "matchNumber": 1,
+    "whiteParticipantId": "tp-1",
+    "blackParticipantId": "tp-3"
+  },
+  "timestamp": "2025-11-20T20:00:00.000Z"
+}
+
+// matchFinished
+{
+  "type": "matchFinished",
+  "payload": {
+    "tournamentId": "t-1",
+    "matchId": "match-1",
+    "round": 1,
+    "winnerParticipantId": "tp-1"
+  },
+  "timestamp": "2025-11-20T19:45:00.000Z"
+}
+
+// tournamentUpdated
+{
+  "type": "tournamentUpdated",
+  "payload": {
+    "tournamentId": "t-1",
+    "type": "started",
+    "round": 1
+  },
+  "timestamp": "2025-11-20T19:00:00.000Z"
+}
+
+// tournamentEnded
+{
+  "type": "tournamentEnded",
+  "payload": {
+    "tournamentId": "t-1",
+    "winnerParticipantId": "tp-1"
+  },
+  "timestamp": "2025-11-20T22:00:00.000Z"
+}
+```
+
+### Notifications temps réel
+Les participants reçoivent des notifications via `/ws/notifications` (`tournament_update`) :
+
+```json
+{
+  "kind": "tournament_update",
+  "title": "Mise à jour tournoi",
+  "message": "Round 2 disponible",
+  "data": {
+    "tournamentId": "t-1",
+    "round": 2,
+    "message": "Round 2 disponible",
+    "payload": {
+      "matchId": "match-3"
     }
-  ]
-}
-```
-
-### GET `/health`
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-11-10T22:00:00.000Z",
-  "uptime": 3600,
-  "database": "connected",
-  "environment": "production"
-}
-```
-
-### GET `/`
-API information endpoint.
-
-**Response:**
-```json
-{
-  "message": "GammonGuru API",
-  "version": "1.0.0",
-  "endpoints": [
-    "GET /health",
-    "GET /api/players",
-    "POST /api/players"
-  ]
+  },
+  "timestamp": "2025-11-20T20:05:00.000Z"
 }
 ```
 
 ---
 
-## 🔧 Development Endpoints
-
-### GET `/api/games/available`
-List available games (placeholder).
-
-### POST `/api/games/join`
-Join a game (placeholder).
-
-### GET `/api/games/my-games`
-List user's games (placeholder).
-
-### GET `/api/games/:gameId/available-moves`
-Get available moves (placeholder).
-
-### GET `/api/games/:gameId/pip-count`
-Get pip count (placeholder).
-
----
-
-## 🏗️ API Architecture
-
-### Authentication
-- **JWT Bearer tokens** required for protected endpoints
-- **Header format:** `Authorization: Bearer <token>`
-- **Token expiration:** 24 hours
-
-### Response Format
-- **Success:** `{ "success": true, "data": {...} }`
-- **Error:** `{ "success": false, "error": "message" }`
-
-### Rate Limiting
-- **General:** 100 requests per 15 minutes per IP
-- **Auth:** 5 login attempts per 15 minutes per IP
-
-### CORS
-- **Allowed origins:** Frontend URL (configured in environment)
-- **Credentials:** Enabled for auth
-- **Health endpoint:** Bypass for monitoring
-
----
-
-## 🧪 Testing Commands
+## Exemples curl
 
 ```bash
-# Health check
-curl https://gammon-guru-api.onrender.com/health
-
-# Register user
-curl -X POST https://gammon-guru-api.onrender.com/api/auth/register \
+# Créer une partie
+curl -X POST "$BASE/api/games" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"testuser","email":"test@example.com","password":"password123"}'
+  -d '{"game_mode":"PLAYER_VS_PLAYER","stake":0}'
 
-# Login
-curl -X POST https://gammon-guru-api.onrender.com/api/auth/login \
+# Obtenir l'état d'une partie
+curl -H "Authorization: Bearer $TOKEN" "$BASE/api/games/$GAME_ID/status"
+
+# Jouer un mouvement
+curl -X POST "$BASE/api/games/$GAME_ID/move" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}'
+  -d '{"from":12,"to":16,"diceUsed":4}'
 
-# Get players list
-curl https://gammon-guru-api.onrender.com/api/players
+# Demander une suggestion IA (stub)
+curl -X POST "$BASE/api/games/$GAME_ID/suggestions" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
 
-## 📊 Implementation Status
-
-### ✅ Fully Implemented
-- User registration & authentication
-- JWT token management
-- Game creation
-- Game state retrieval
-- Dice rolling
-- Move recording
-- AI opponent moves
-- AI move suggestions
-- AI position analysis
-- Health monitoring
-- Database connectivity
-
-### 🔄 Partially Implemented
-- User profile management
-- Game joining (placeholder)
-- Available games listing (placeholder)
-
-### 📝 Not Yet Implemented
-- Real-time multiplayer (WebSocket)
-- Advanced AI heuristics
-- Tournament system
-- Game replays
-
----
-
-## 🚀 Ready for Frontend Integration
-
-**API is production-ready and deployed!**
-
-**Next steps:**
-1. Connect frontend to Render API URL
-2. Implement authentication UI
-3. Build game interface
-4. Add real-time features
+Dernière mise à jour : 11 novembre 2025

@@ -97,7 +97,7 @@ quit
           
           return hint;
           
-        } catch (windowsError) {
+        } catch (_windowsError) {
           // Essayer avec chemin complet Windows
           command = '"C:\\Program Files (x86)\\gnubg\\gnubg-cli.exe" -t < "' + inputFile + '"';
           const { stdout, stderr } = await execAsync(command, { 
@@ -223,7 +223,7 @@ quit
             
             return this.parseEvaluationOutput(stdout);
             
-          } catch (windowsError) {
+          } catch (_windowsError) {
             // Essayer avec chemin complet Windows
             command = '"C:\\Program Files (x86)\\gnubg\\gnubg-cli.exe" -t < "' + inputFile + '"';
             const { stdout } = await execAsync(command, { 
@@ -289,23 +289,19 @@ quit
   }
 
   // Analyser une partie complète
-  static async analyzeGame(moves: Move[]): Promise<{
+  static async analyzeGame(_moves: Move[]): Promise<{
     totalError: number;
     errorRate: number;
     criticalMoves: number;
     analysis: string;
   }> {
-    try {
-      // TODO: Implémenter l'analyse de partie complète
-      return {
-        totalError: 0.0,
-        errorRate: 0.0,
-        criticalMoves: 0,
-        analysis: 'Game analysis not yet implemented'
-      };
-    } catch (error) {
-      throw new Error(`Failed to analyze game: ${error}`);
-    }
+    // TODO: Implémenter l'analyse de partie complète via GNUBG
+    return {
+      totalError: 0.0,
+      errorRate: 0.0,
+      criticalMoves: 0,
+      analysis: 'Game analysis not yet implemented'
+    };
   }
 
   // Vérifier que GNUBG est installé

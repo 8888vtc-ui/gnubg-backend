@@ -38,7 +38,6 @@ export class BackgammonEngine {
 
   // Valider un mouvement
   static validateMove(move: Move, board: BoardState, dice: DiceState): ValidationResult {
-    // 1. Vérifier que le mouvement utilise un dé valide
     if (!dice.remaining.includes(move.diceUsed)) {
       return {
         valid: false,
@@ -46,26 +45,49 @@ export class BackgammonEngine {
       };
     }
 
-    // 2. Vérifier que c'est le tour du bon joueur
-    const direction = move.player === 'white' ? 1 : -1;
-    
-    // 3. Valider le mouvement selon la position de départ
-    if (move.from === 24) {
-      // Mouvement depuis le bar
-      return this.validateFromBar(move, board, dice);
-    } else if (move.to === 25) {
-      // Bearing off
-      return this.validateBearingOff(move, board, dice);
-    } else {
-      // Mouvement normal
-      return this.validateNormalMove(move, board, dice);
+    const mustEnterFromBar = this.playerHasPiecesOnBar(board, move.player);
+    if (mustEnterFromBar && move.from !== 24) {
+      return {
+        valid: false,
+        error: 'You must enter all checkers from the bar before moving others'
+      };
     }
+
+    const playableDice = this.getPlayableDice(board, dice, move.player, mustEnterFromBar);
+    if (playableDice.length === 0) {
+      return { valid: false, error: 'No legal moves available for current dice' };
+    }
+
+    const highestPlayable = Math.max(...playableDice);
+    if (highestPlayable > move.diceUsed) {
+      return {
+        valid: false,
+        error: `Must use the highest available die (${highestPlayable})`
+      };
+    }
+
+    if (!playableDice.includes(move.diceUsed)) {
+      return {
+        valid: false,
+        error: `Die value ${move.diceUsed} cannot be used for any legal move`
+      };
+    }
+
+    if (move.from === 24) {
+      return this.validateFromBar(move, board, dice);
+    }
+
+    if (move.to === 25) {
+      return this.validateBearingOff(move, board, dice);
+    }
+
+    return this.validateNormalMove(move, board, dice);
   }
 
   // Valider mouvement depuis le bar
-  private static validateFromBar(move: Move, board: BoardState, dice: DiceState): ValidationResult {
+  private static validateFromBar(move: Move, board: BoardState, _dice: DiceState): ValidationResult {
     const playerBar = move.player === 'white' ? board.whiteBar : board.blackBar;
-    
+
     if (playerBar === 0) {
       return {
         valid: false,
@@ -73,21 +95,24 @@ export class BackgammonEngine {
       };
     }
 
-    // Pour sortir du bar, on doit entrer dans la maison adverse (positions 0-5 ou 18-23)
-    const homeStart = move.player === 'white' ? 18 : 0;
-    const homeEnd = move.player === 'white' ? 24 : 6;
-    
-    if (move.to < homeStart || move.to >= homeEnd) {
+    const targetIndex = this.entryPointFromBar(move.player, move.diceUsed);
+    if (targetIndex === null) {
       return {
         valid: false,
-        error: 'Must enter from bar to opponent\'s home board'
+        error: 'Die does not correspond to a valid entry point from the bar'
       };
     }
 
-    // Vérifier que la destination est valide
-    const targetPosition = board.positions[move.to];
+    if (move.to !== targetIndex) {
+      return {
+        valid: false,
+        error: 'Must enter on the point indicated by the die value'
+      };
+    }
+
+    const targetPosition = board.positions[targetIndex];
     const canLand = this.canLandOn(targetPosition, move.player);
-    
+
     if (!canLand) {
       return {
         valid: false,
@@ -99,8 +124,7 @@ export class BackgammonEngine {
   }
 
   // Valider bearing off (sortie de pièces)
-  private static validateBearingOff(move: Move, board: BoardState, dice: DiceState): ValidationResult {
-    // Vérifier que toutes les pièces sont dans la maison
+  private static validateBearingOff(move: Move, board: BoardState, _dice: DiceState): ValidationResult {
     if (!this.allPiecesInHome(move.player, board)) {
       return {
         valid: false,
@@ -108,7 +132,6 @@ export class BackgammonEngine {
       };
     }
 
-    // Vérifier que la pièce existe à la position de départ
     if (move.from < 0 || move.from > 23) {
       return {
         valid: false,
@@ -127,12 +150,38 @@ export class BackgammonEngine {
       };
     }
 
+    const direction = move.player === 'white' ? 1 : -1;
+    const target = move.from + move.diceUsed * direction;
+
+    if (move.player === 'white') {
+      if (target < 24 && target !== 24) {
+        return { valid: false, error: 'Die value does not bear off this checker' };
+      }
+
+      if (target > 24 && this.hasPiecesBehindInHome(move.player, board, move.from)) {
+        return {
+          valid: false,
+          error: 'Cannot bear off with a higher die while pieces remain behind'
+        };
+      }
+    } else {
+      if (target > -1 && target !== -1) {
+        return { valid: false, error: 'Die value does not bear off this checker' };
+      }
+
+      if (target < -1 && this.hasPiecesBehindInHome(move.player, board, move.from)) {
+        return {
+          valid: false,
+          error: 'Cannot bear off with a higher die while pieces remain behind'
+        };
+      }
+    }
+
     return { valid: true };
   }
 
   // Valider mouvement normal
-  private static validateNormalMove(move: Move, board: BoardState, dice: DiceState): ValidationResult {
-    // Vérifier positions valides
+  private static validateNormalMove(move: Move, board: BoardState, _dice: DiceState): ValidationResult {
     if (move.from < 0 || move.from > 23 || move.to < 0 || move.to > 23) {
       return {
         valid: false,
@@ -155,7 +204,7 @@ export class BackgammonEngine {
     // Vérifier la direction du mouvement
     const direction = move.player === 'white' ? 1 : -1;
     const actualMove = (move.to - move.from) * direction;
-    
+
     if (actualMove !== move.diceUsed) {
       return {
         valid: false,
@@ -275,48 +324,50 @@ export class BackgammonEngine {
   // Calculer tous les mouvements possibles
   static calculateAvailableMoves(player: PlayerColor, board: BoardState, dice: DiceState): Move[] {
     const moves: Move[] = [];
+    const mustEnterFromBar = this.playerHasPiecesOnBar(board, player);
+    const playableDice = this.getPlayableDice(board, dice, player, mustEnterFromBar);
 
-    // Pour chaque dé disponible
-    for (const dieValue of dice.remaining) {
-      // Mouvements depuis chaque position
-      for (let from = 0; from < 24; from++) {
-        const pieces = player === 'white' ? board.positions[from] : -board.positions[from];
-        if (pieces <= 0) continue;
+    if (playableDice.length === 0) {
+      return moves;
+    }
 
-        const direction = player === 'white' ? 1 : -1;
-        const to = from + (dieValue * direction);
+    const direction = player === 'white' ? 1 : -1;
+    const diceValues = dice.remaining.length ? dice.remaining : [...dice.dice];
 
-        // Mouvement normal
-        if (to >= 0 && to < 24) {
-          const move: Move = { from, to, player, diceUsed: dieValue };
-          const validation = this.validateMove(move, board, dice);
-          if (validation.valid) {
-            moves.push(move);
-          }
-        }
-
-        // Bearing off
-        if (this.allPiecesInHome(player, board)) {
-          const move: Move = { from, to: 25, player, diceUsed: dieValue };
-          const validation = this.validateMove(move, board, dice);
-          if (validation.valid) {
-            moves.push(move);
-          }
-        }
+    for (const dieValue of diceValues) {
+      if (!playableDice.includes(dieValue)) {
+        continue;
       }
 
-      // Mouvements depuis le bar
-      const playerBar = player === 'white' ? board.whiteBar : board.blackBar;
-      if (playerBar > 0) {
-        const homeStart = player === 'white' ? 18 : 0;
-        const homeEnd = player === 'white' ? 24 : 6;
+      if (mustEnterFromBar) {
+        const to = this.entryPointFromBar(player, dieValue);
+        if (to !== null && this.canLandOn(board.positions[to], player)) {
+          moves.push({ from: 24, to, player, diceUsed: dieValue });
+        }
+        continue;
+      }
 
-        for (let to = homeStart; to < homeEnd; to++) {
-          const move: Move = { from: 24, to, player, diceUsed: dieValue };
-          const validation = this.validateMove(move, board, dice);
-          if (validation.valid) {
-            moves.push(move);
+      for (let from = 0; from < 24; from++) {
+        if (!this.belongsToPlayer(board.positions[from], player)) {
+          continue;
+        }
+
+        const target = from + dieValue * direction;
+
+        if (target >= 0 && target < 24) {
+          if (this.canLandOn(board.positions[target], player)) {
+            moves.push({ from, to: target, player, diceUsed: dieValue });
           }
+          continue;
+        }
+
+        if (!this.allPiecesInHome(player, board)) {
+          continue;
+        }
+
+        const canBearOff = this.canBearOffFrom(player, board, from, dieValue);
+        if (canBearOff) {
+          moves.push({ from, to: 25, player, diceUsed: dieValue });
         }
       }
     }
@@ -350,5 +401,146 @@ export class BackgammonEngine {
     blackPip += board.blackBar * 25;
 
     return { white: whitePip, black: blackPip };
+  }
+
+  private static getHomeRange(player: PlayerColor): { start: number; end: number } {
+    return player === 'white'
+      ? { start: 18, end: 24 }
+      : { start: 0, end: 6 };
+  }
+
+  private static entryPointFromBar(player: PlayerColor, dieValue: number): number | null {
+    if (dieValue < 1 || dieValue > 6) {
+      return null;
+    }
+
+    if (player === 'white') {
+      return 24 - dieValue;
+    }
+
+    return dieValue - 1;
+  }
+
+  private static belongsToPlayer(position: number, player: PlayerColor): boolean {
+    if (player === 'white') {
+      return position > 0;
+    }
+    return position < 0;
+  }
+
+  private static hasPiecesBehindInHome(player: PlayerColor, board: BoardState, point: number): boolean {
+    const { start, end } = this.getHomeRange(player);
+
+    if (player === 'white') {
+      for (let i = start; i < point; i++) {
+        if (board.positions[i] > 0) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    for (let i = end - 1; i > point; i--) {
+      if (board.positions[i] < 0) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private static playerHasPiecesOnBar(board: BoardState, player: PlayerColor): boolean {
+    return player === 'white' ? board.whiteBar > 0 : board.blackBar > 0;
+  }
+
+  private static getPlayableDice(
+    board: BoardState,
+    dice: DiceState,
+    player: PlayerColor,
+    mustEnterFromBar: boolean
+  ): number[] {
+    const uniqueDice = Array.from(new Set(dice.remaining.length ? dice.remaining : dice.dice));
+    uniqueDice.sort((a, b) => b - a);
+
+    const playable: number[] = [];
+
+    for (const dieValue of uniqueDice) {
+      if (this.hasLegalMoveForDie(board, player, dieValue, mustEnterFromBar)) {
+        playable.push(dieValue);
+      }
+    }
+
+    return playable;
+  }
+
+  private static hasLegalMoveForDie(
+    board: BoardState,
+    player: PlayerColor,
+    dieValue: number,
+    mustEnterFromBar: boolean
+  ): boolean {
+    if (mustEnterFromBar) {
+      const target = this.entryPointFromBar(player, dieValue);
+      if (target === null) {
+        return false;
+      }
+      return this.canLandOn(board.positions[target], player);
+    }
+
+    const direction = player === 'white' ? 1 : -1;
+
+    for (let from = 0; from < 24; from++) {
+      if (!this.belongsToPlayer(board.positions[from], player)) {
+        continue;
+      }
+
+      const target = from + dieValue * direction;
+
+      if (target >= 0 && target < 24) {
+        if (this.canLandOn(board.positions[target], player)) {
+          return true;
+        }
+        continue;
+      }
+
+      if (!this.allPiecesInHome(player, board)) {
+        continue;
+      }
+
+      if (this.canBearOffFrom(player, board, from, dieValue)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private static canBearOffFrom(player: PlayerColor, board: BoardState, from: number, dieValue: number): boolean {
+    if (!this.allPiecesInHome(player, board)) {
+      return false;
+    }
+
+    const direction = player === 'white' ? 1 : -1;
+    const target = from + dieValue * direction;
+
+    if (player === 'white') {
+      if (target === 24) {
+        return true;
+      }
+      if (target > 24) {
+        return !this.hasPiecesBehindInHome(player, board, from);
+      }
+      return false;
+    }
+
+    if (target === -1) {
+      return true;
+    }
+
+    if (target < -1) {
+      return !this.hasPiecesBehindInHome(player, board, from);
+    }
+
+    return false;
   }
 }

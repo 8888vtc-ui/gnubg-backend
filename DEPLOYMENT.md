@@ -1,12 +1,8 @@
 # 🚀 GammonGuru Deployment Guide
 
-## 📋 Overview
+## 📋 Aperçu
 
-GammonGuru is a real-time Backgammon game with AI coaching, featuring:
-- WebSocket multiplayer functionality
-- Claude AI and OpenAI integration
-- Image generation with Replicate
-- Vue.js frontend + Node.js backend
+GammonGuru s'appuie sur un backend **Express.js + Prisma** (déployé sur Render) et un frontend **Vue 3** (Netlify). Les fonctionnalités en production couvrent la création et la gestion de parties `/api/games`, l'authentification, ainsi que les fondations de la couche IA.
 
 ## 🏗️ Architecture
 
@@ -19,37 +15,40 @@ GammonGuru is a real-time Backgammon game with AI coaching, featuring:
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-## 🔧 Backend Deployment (Railway)
+## 🔧 Backend Deployment (Render)
 
 ### 1. Prerequisites
 - Railway account
 - GitHub repository connected
 
 ### 2. Configuration
-The `railway.toml` file contains all necessary configurations:
-- Environment variables
-- Build settings
-- Health checks
-- Auto-scaling
+Le backend est déployé sur Render (web service Node basé sur Express) avec Netlify Functions en complément pour certaines actions serverless.
 
 ### 3. Environment Variables
-Set these in Railway dashboard:
+À définir dans Render :
 ```bash
 NODE_ENV=production
-JWT_SECRET=your-super-secret-jwt-key
-ANTHROPIC_API_KEY=sk-ant-api03-...
-OPENAI_API_KEY=sk-proj-...
-REPLICATE_API_TOKEN=r8_...
-```
+DATABASE_URL=postgresql://...
+JWT_SECRET=super-secret
+SUPABASE_SERVICE_KEY=...
+SUPABASE_URL=https://....supabase.co
+``` 
+Ajouter les clés IA (Claude/OpenAI) si nécessaire.
 
 ### 4. Deployment Steps
-1. Connect repo to Railway
-2. Railway will auto-detect Node.js
-3. Set environment variables
-4. Deploy - Railway handles the rest!
+1. Connecter le dépôt GitHub à Render.
+2. Définir les variables d'environnement ci-dessus.
+3. Activer le build automatique (`npm install && npm run build`).
+4. Avant chaque déploiement, exécuter localement :
+   ```bash
+   npx prisma migrate dev
+   npx prisma generate
+   ```
+   (en production, utiliser `npx prisma migrate deploy`).
+5. Déployer : Render se charge du démarrage via `npm start`.
 
 ### 5. Health Check
-Backend will be available at: `https://your-app.railway.app/health`
+Health check: `https://gammon-guru-api.onrender.com/health`
 
 ## 🌐 Frontend Deployment (Netlify)
 
@@ -72,13 +71,10 @@ The `netlify.toml` file contains:
 - API redirects
 
 ### 4. Environment Variables
-Set these in Netlify dashboard:
+À définir dans Netlify :
 ```bash
-VITE_API_BASE_URL=https://your-backend.railway.app
-VITE_WS_BASE_URL=wss://your-backend.railway.app
-VITE_CLAUDE_API_KEY=sk-ant-api03-...
-VITE_OPENAI_API_KEY=sk-proj-...
-VITE_REPLICATE_API_TOKEN=r8_...
+VITE_API_BASE_URL=https://gammon-guru-api.onrender.com
+VITE_WS_BASE_URL=wss://gammon-guru-api.onrender.com
 ```
 
 ### 5. Deployment Steps
@@ -95,8 +91,8 @@ VITE_REPLICATE_API_TOKEN=r8_...
 - Frontend: `http://localhost:5173`
 
 ### Production
-- Backend: `wss://your-backend.railway.app`
-- Frontend: `https://your-frontend.netlify.app`
+- Backend: `wss://gammon-guru-api.onrender.com`
+- Frontend: `https://gammon-guru.netlify.app`
 
 ### WebSocket Endpoints
 - Notifications: `wss://backend/ws/notifications?token=xxx`
@@ -106,36 +102,17 @@ VITE_REPLICATE_API_TOKEN=r8_...
 
 ## 🤖 AI Services Integration
 
-### Claude AI (Anthropic)
-```javascript
-// API endpoint: /api/claude/chat
-// Features: Game analysis, move suggestions, coaching
-```
-
-### OpenAI GPT
-```javascript
-// API endpoint: /api/openai/chat
-// Features: General conversation, help system
-```
-
-### Image Generation (Replicate)
-```javascript
-// API endpoint: /api/images/generate
-// Features: Board images, diagrams, avatars
-```
+Les intégrations IA (Claude/OpenAI, Replicate) sont en attente de branchement final ; conserver les variables masquées tant qu'elles ne sont pas utilisées.
 
 ## 🧪 Testing Production
 
 ### 1. Health Checks
 ```bash
 # Backend health
-curl https://your-backend.railway.app/health
-
-# WebSocket stats
-curl https://your-backend.railway.app/api/ws/stats
+curl https://gammon-guru-api.onrender.com/health
 
 # Frontend accessibility
-curl https://your-frontend.netlify.app
+curl https://gammon-guru.netlify.app
 ```
 
 ### 2. WebSocket Testing
@@ -220,7 +197,7 @@ curl /api/ws/stats
    - Review API permissions
 
 3. **Build Failures**
-   - Check Node.js version (20+)
+   - Check Node.js version (18+)
    - Verify dependencies
    - Review build logs
 

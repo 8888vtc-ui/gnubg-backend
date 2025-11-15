@@ -4,8 +4,9 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../server';
 import { config } from '../config';
 
-// Use validated JWT_SECRET from config
-const JWT_SECRET = config.jwtSecret!; // ! because config validates it exists
+interface JwtUserPayload extends jwt.JwtPayload {
+  userId: string;
+}
 
 // Interface pour étendre Request
 export interface AuthRequest extends Request {
@@ -19,25 +20,51 @@ export interface AuthRequest extends Request {
 // Middleware d'authentification
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!config.accessTokenSecret) {
+      res.status(500).json({
+        success: false,
+        error: 'Authentication service misconfigured.'
+      });
+      return;
+    }
+
     // Récupérer le token du header Authorization
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Access denied. No token provided.'
       });
+      return;
     }
 
     // Extraire le token
     const token = authHeader.substring(7); // Supprimer "Bearer "
 
     // Vérifier le token
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    let decodedToken: string | JwtUserPayload;
+    try {
+      decodedToken = jwt.verify(token, config.accessTokenSecret) as string | JwtUserPayload;
+    } catch (error) {
+      res.status(401).json({
+        success: false,
+        error: 'Invalid token.'
+      });
+      return;
+    }
+
+    if (typeof decodedToken !== 'object' || !('userId' in decodedToken) || !decodedToken.userId) {
+      res.status(401).json({
+        success: false,
+        error: 'Invalid token payload.'
+      });
+      return;
+    }
     
     // Récupérer l'utilisateur depuis la base
     const user = await prisma.users.findUnique({
-      where: { id: decoded.userId },
+      where: { id: decodedToken.userId },
       select: {
         id: true,
         email: true,
@@ -46,20 +73,26 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     });
 
     if (!user) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Invalid token. User not found.'
       });
+      return;
     }
 
     // Ajouter l'utilisateur à la requête
-    req.user = user;
+    req.user = {
+      id: user.id,
+      email: user.email,
+      username: user.username ?? 'anonymous'
+    };
     
     next();
   } catch (error) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: 'Invalid token.'
     });
+    return;
   }
 };

@@ -1,21 +1,31 @@
 // src/utils/logger.ts
 export class Logger {
-  private context: string;
-  
+  private readonly context: string;
+
   constructor(context: string) {
     this.context = context;
   }
-  
-  info(message: string, data?: any) {
-    console.log(`[${new Date().toISOString()}] [${this.context}] INFO: ${message}`, data || '');
+
+  info(message: string, data?: unknown) {
+    const payload = data ?? '';
+    console.log(`[${new Date().toISOString()}] [${this.context}] INFO: ${message}`, payload);
   }
-  
-  error(message: string, error?: Error) {
-    console.error(`[${new Date().toISOString()}] [${this.context}] ERROR: ${message}`, error || '');
+
+  error(message: string, error?: unknown) {
+    const payload = error instanceof Error ? error : error ?? '';
+    console.error(`[${new Date().toISOString()}] [${this.context}] ERROR: ${message}`, payload);
   }
-  
-  warn(message: string, data?: any) {
-    console.warn(`[${new Date().toISOString()}] [${this.context}] WARN: ${message}`, data || '');
+
+  warn(message: string, data?: unknown) {
+    const payload = data ?? '';
+    console.warn(`[${new Date().toISOString()}] [${this.context}] WARN: ${message}`, payload);
+  }
+
+  debug(message: string, data?: unknown) {
+    if (process.env.NODE_ENV !== 'production') {
+      const payload = data ?? '';
+      console.debug(`[${new Date().toISOString()}] [${this.context}] DEBUG: ${message}`, payload);
+    }
   }
 }
 

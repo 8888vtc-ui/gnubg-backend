@@ -1,10 +1,13 @@
 // src/types/game.ts
 // Types pour les parties de backgammon
 
+import type { GameMode } from '@prisma/client';
+import type { CubeHistoryEntry } from '../services/rules/cubeLogic';
+import type { CrawfordState } from '../services/rules/matchEngine';
 import type { Player } from './player';
 
 // Types pour le statut d'une partie
-export type GameStatus = 'waiting' | 'playing' | 'finished' | 'abandoned';
+export type GameStatus = 'waiting' | 'playing' | 'completed' | 'abandoned' | 'draw_pending';
 
 // Types pour le type de partie
 export type GameType = 'match' | 'money_game' | 'tournament';
@@ -16,6 +19,15 @@ export interface BoardState {
   blackBar: number;        // Pièces noires capturées
   whiteOff: number;        // Pièces blanches sorties
   blackOff: number;        // Pièces noires sorties
+}
+
+export interface CubeSnapshot {
+  level: number;
+  owner: PlayerColor | null;
+  isCentered: boolean;
+  doublePending: boolean;
+  doubleOfferedBy: PlayerColor | null;
+  history: CubeHistoryEntry[];
 }
 
 export interface DiceState {
@@ -48,7 +60,16 @@ export interface GameState {
   status: GameStatus;
   gameType: GameType;
   stake: number;
+  timeControl: TimeControlPreset | null;
+  whiteTimeMs: number | null;
+  blackTimeMs: number | null;
+  matchLength: number | null;
+  crawford: CrawfordState;
+  cube: CubeSnapshot;
+  whiteScore: number;
+  blackScore: number;
   winner: Player | null;
+  drawOfferBy: PlayerColor | null;
   board: BoardState;
   currentPlayer: 'white' | 'black';
   dice: DiceState;
@@ -56,6 +77,15 @@ export interface GameState {
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
+}
+
+export type TimeControlPreset = 'BLITZ' | 'NORMAL' | 'LONG' | 'CUSTOM';
+
+export interface TimeControlConfig {
+  preset: TimeControlPreset;
+  totalTimeMs: number;
+  incrementMs: number;
+  delayMs: number;
 }
 
 // Interface pour une partie (compatible avec Prisma)
@@ -66,10 +96,28 @@ export interface Game {
   status: GameStatus;   // Statut actuel de la partie
   gameType: GameType;   // Type de partie
   stake: number;        // Mise en points
+  timeControl: TimeControlPreset | null;
+  whiteTimeMs: number | null;
+  blackTimeMs: number | null;
+  matchLength: number | null;
+  cube: CubeSnapshot;
+  whiteScore: number;
+  blackScore: number;
   winner: Player | null; // Gagnant (null si pas terminé)
   createdAt: Date;      // Date de création
   startedAt: Date | null; // Date de début (null si pas commencé)
   finishedAt: Date | null; // Date de fin (null si pas terminé)
+}
+
+export interface GameSummary {
+  id: string;
+  status: GameStatus;
+  currentPlayer: PlayerColor;
+  cube: CubeSnapshot;
+  crawford: CrawfordState;
+  matchLength: number | null;
+  whiteScore: number;
+  blackScore: number;
 }
 
 // Types pour les requêtes API
@@ -80,6 +128,53 @@ export interface CreateGameRequest {
 
 export interface JoinGameRequest {
   gameId: string;
+}
+
+export interface CreateGameInput {
+  userId: string;
+  mode: GameMode;
+  stake: number;
+  opponentId?: string | null;
+}
+
+export interface JoinGameInput {
+  gameId: string;
+  userId: string;
+}
+
+export interface RollDiceInput {
+  gameId: string;
+  userId: string;
+}
+
+export interface MoveInput {
+  gameId: string;
+  userId: string;
+  from: number;
+  to: number;
+  diceUsed: number;
+}
+
+export interface ResignGameInput {
+  gameId: string;
+  userId: string;
+}
+
+export interface ResignGameRequest extends ResignGameInput {
+  resignationType: 'SINGLE' | 'GAMMON' | 'BACKGAMMON';
+}
+
+export interface ResignGameResult {
+  gameId: string;
+  winner: 'white' | 'black';
+  resignationType: 'SINGLE' | 'GAMMON' | 'BACKGAMMON';
+  pointsAwarded: number;
+  finished: boolean;
+}
+
+export interface DrawOfferInput {
+  gameId: string;
+  userId: string;
 }
 
 export interface MakeMoveRequest {
@@ -115,6 +210,20 @@ export function createGame(
     status: 'waiting',
     gameType,
     stake,
+    timeControl: null,
+    whiteTimeMs: null,
+    blackTimeMs: null,
+    matchLength: null,
+    cube: {
+      level: 1,
+      owner: null,
+      isCentered: true,
+      doublePending: false,
+      doubleOfferedBy: null,
+      history: []
+    },
+    whiteScore: 0,
+    blackScore: 0,
     winner: null,
     createdAt: new Date(),
     startedAt: null,
@@ -126,6 +235,21 @@ export function createGame(
 export function createInitialGameState(player1: Player): GameState {
   return {
     ...createGame(player1, 'match', 100),
+    whiteScore: 0,
+    blackScore: 0,
+    timeControl: null,
+    whiteTimeMs: null,
+    blackTimeMs: null,
+    matchLength: null,
+    cube: {
+      level: 1,
+      owner: null,
+      isCentered: true,
+      doublePending: false,
+      doubleOfferedBy: null,
+      history: []
+    },
+    drawOfferBy: null,
     board: INITIAL_BOARD,
     currentPlayer: 'white',
     dice: {
@@ -144,6 +268,7 @@ export function startGame(game: Game, player2: Player): Game {
     ...game,
     player2,
     status: 'playing',
+    timeControl: game.timeControl ?? null,
     startedAt: new Date()
   };
 }
@@ -152,7 +277,7 @@ export function startGame(game: Game, player2: Player): Game {
 export function finishGame(game: Game, winner: Player): Game {
   return {
     ...game,
-    status: 'finished',
+    status: 'completed',
     winner,
     finishedAt: new Date()
   };
