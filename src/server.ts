@@ -11,6 +11,46 @@ import { PrismaClient } from '@prisma/client';
 import type { Server } from 'http';
 import { config } from './config';
 import { logger } from './utils/logger';
+import { validateEnv } from './utils/validateEnv';
+
+const hasPgSplitConfig = Boolean(process.env.PGHOST);
+const secretKeys: string[] = ['ACCESS_TOKEN_SECRET', 'REFRESH_TOKEN_SECRET'];
+const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
+const isProductionEnv = (process.env.NODE_ENV || '').toLowerCase() === 'production';
+
+if (!hasDatabaseUrl && !hasPgSplitConfig) {
+  const message =
+    '[startup] Critical configuration: either DATABASE_URL or PGHOST/PGUSER/PGPASSWORD/PGDATABASE/PGPORT must be set.';
+  console.error(message);
+  process.exit(1);
+}
+
+if (isProductionEnv && !process.env.PORT) {
+  const message = '[startup] Critical configuration: PORT is required in production.';
+  console.error(message);
+  process.exit(1);
+}
+
+if (hasPgSplitConfig) {
+  validateEnv(secretKeys);
+  validateEnv(undefined, { allowMissingDatabase: true });
+} else {
+  validateEnv(['DATABASE_URL', ...secretKeys]);
+}
+
+if (!process.env.DATABASE_URL && hasPgSplitConfig) {
+  const host = process.env.PGHOST;
+  const user = process.env.PGUSER;
+  const password = process.env.PGPASSWORD;
+  const database = process.env.PGDATABASE;
+  const port = process.env.PGPORT;
+
+  if (host && user && password && database && port) {
+    const encodedPassword = encodeURIComponent(password);
+    process.env.DATABASE_URL = `postgresql://${user}:${encodedPassword}@${host}:${port}/${database}?schema=public`;
+  }
+}
+
 import { loggerMiddleware } from './middleware/loggerMiddleware';
 import { requestIdMiddleware } from './middleware/requestId';
 import cors from 'cors';
@@ -459,10 +499,12 @@ let sessionCleanupHandle: NodeJS.Timeout | null = null;
 
 if (config.nodeEnv !== 'test') {
   server = app.listen(config.port, () => {
+    logger.info(`Server listening on :${config.port}`);
     logger.info(`🛡️  ENTERPRISE-GRADE GammonGuru API running on port ${config.port}`);
     logger.info('🔒 Security: Helmet, CORS, Rate Limiting, DDoS Protection, Input Sanitization');
     logger.info('🗜️  Performance: Gzip Compression, Redis Caching, Connection Pooling');
     logger.info('📊 Monitoring: Audit Logging, Health Checks, Performance Metrics');
+
     logger.info('🚀 Optimization: Request Timeouts, HPP Protection, Error Sanitization');
     logger.info(`🌍 Environment: ${config.nodeEnv} | Uptime: ${Math.round(process.uptime())}s`);
 

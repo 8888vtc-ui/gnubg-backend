@@ -1,17 +1,14 @@
 services:
   - type: web
-    name: gammon-guru-backend
-    runtime: node
-    buildCommand: npm install --include=dev && npm run build
-    startCommand: npm start
+    name: gurugammon
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
     envVars:
+      # Non-sensitive defaults only. Secrets must be set in Render dashboard.
       - key: NODE_ENV
         value: production
-      - key: JWT_SECRET
-        generateValue: true
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: FRONTEND_URL
-        value: https://gammon-guru.netlify.app
+      - key: NODE_VERSION
+        value: 20.11.1

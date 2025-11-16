@@ -4,8 +4,9 @@ import { prisma } from '../server';
 
 export type UserPlan = 'free' | 'premium';
 
-const ACTIVE_STATUSES: SubscriptionStatus[] = [SubscriptionStatus.ACTIVE];
-const PREMIUM_PLANS: SubscriptionPlan[] = [SubscriptionPlan.PREMIUM, SubscriptionPlan.VIP];
+// Using string literals that match the enum values in schema.prisma
+const ACTIVE_STATUSES: SubscriptionStatus[] = ['ACTIVE'];
+const PREMIUM_PLANS: SubscriptionPlan[] = ['PREMIUM', 'VIP'];
 
 export const SubscriptionService = {
   async getUserPlan(userId: string): Promise<UserPlan> {

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../server';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 import {
   gameSessionDbDurationSeconds,
@@ -647,21 +647,80 @@ export const GameSessionRegistry = {
   },
 
   async cleanupExpiredSessions(): Promise<number> {
-    const result = (await measureDbCall('cleanup_expired_sessions', () =>
-      db.gameSession.deleteMany({
-        where: {
-          expiresAt: {
-            lt: now()
+    try {
+      const rows = (await measureDbCall('find_expired_sessions', () =>
+        db.gameSession.findMany({
+          where: {
+            expiresAt: {
+              lt: now()
+            }
+          },
+          select: {
+            id: true
           }
-        }
-      })
-    )) as Record<string, unknown>;
+        })
+      )) as unknown;
 
-    return getNumber(result.count, 0);
+      if (!Array.isArray(rows)) {
+        logger.warn(
+          'cleanupExpiredSessions: unexpected non-array result',
+          {
+            context: 'GameSessionRegistryScheduler',
+            rows
+          }
+        );
+        return 0;
+      }
+
+      let deleted = 0;
+
+      for (const row of rows) {
+        if (!row || typeof row !== 'object') {
+          logger.warn('Skipping invalid row during cleanup', {
+            context: 'GameSessionRegistryScheduler',
+            row
+          });
+          continue;
+        }
+
+        const sessionId = typeof (row as { id?: unknown }).id === 'string' ? (row as { id: string }).id : null;
+        if (!sessionId) {
+          logger.warn('Skipping row with missing session id', {
+            context: 'GameSessionRegistryScheduler',
+            row
+          });
+          continue;
+        }
+
+        try {
+          await measureDbCall('delete_expired_session', () =>
+            db.gameSession.delete({
+              where: { id: sessionId }
+            })
+          );
+          deleted += 1;
+        } catch (innerError) {
+          logger.error('Error cleaning expired session', {
+            context: 'GameSessionRegistryScheduler',
+            sessionId,
+            error: innerError
+          });
+        }
+      }
+
+      return deleted;
+    } catch (error) {
+      logger.error('cleanupExpiredSessions top-level failure', {
+        context: 'GameSessionRegistryScheduler',
+        error
+      });
+      return 0;
+    }
   }
 };
 
 const DEFAULT_CLEANUP_INTERVAL_MS = 60_000; // 1 minute baseline; override via env
+const CLEANUP_ENABLED = process.env.GAMESESSION_CLEANUP_ENABLED !== 'false';
 
 let cleanupIntervalHandle: NodeJS.Timeout | null = null;
 
@@ -669,6 +728,13 @@ export const GameSessionRegistryScheduler = {
   start(intervalMs = DEFAULT_CLEANUP_INTERVAL_MS) {
     if (cleanupIntervalHandle) {
       return cleanupIntervalHandle;
+    }
+
+    if (!CLEANUP_ENABLED) {
+      logger.info('cleanup disabled via env', {
+        context: 'GameSessionRegistryScheduler'
+      });
+      return null;
     }
 
     cleanupIntervalHandle = setInterval(async () => {
