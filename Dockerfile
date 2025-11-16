@@ -1,10 +1,13 @@
-FROM node:18
+FROM node:20.11.1
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+
+# Copy package files and auxiliary scripts needed during install
 COPY package*.json package-lock.json ./
+COPY scripts ./scripts
+COPY vendor ./vendor
 
 # Install all dependencies (including dev dependencies for build)
 RUN npm ci
